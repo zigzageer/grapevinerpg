@@ -99,7 +99,7 @@ describe("server games", () => {
     });
     const loaded = loadServerSave({ ...server, characters: [character] });
     expect(loaded.crew[0].name).toBe("Bob");
-    expect(loaded.activeCharacter).toBe(character.id);
+    expect(loaded.activeCharacter).toBeUndefined();
     expect(loaded.player).toEqual(START);
   });
 });

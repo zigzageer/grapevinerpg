@@ -11,7 +11,7 @@ export function Modal({
 }: {
   title: string;
   eyebrow?: string;
-  onClose: () => void;
+  onClose?: () => void;
   children: ReactNode;
   wide?: boolean;
   className?: string;
@@ -26,7 +26,7 @@ export function Modal({
       if (e.key === "Escape") {
         e.preventDefault();
         e.stopPropagation();
-        closeRef.current();
+        closeRef.current?.();
       }
       if (e.key === "Tab") {
         const all = Array.from(
@@ -67,7 +67,7 @@ export function Modal({
     <div
       className="modal-backdrop"
       onPointerDown={(e) => {
-        if (e.target === e.currentTarget) onClose();
+        if (e.target === e.currentTarget) onClose?.();
       }}
     >
       <div
@@ -83,13 +83,15 @@ export function Modal({
             {eyebrow && <span className="eyebrow">{eyebrow}</span>}
             <h2>{title}</h2>
           </div>
-          <button
-            className="icon-button"
-            aria-label="Close dialog"
-            onClick={onClose}
-          >
-            <X size={20} />
-          </button>
+          {onClose && (
+            <button
+              className="icon-button"
+              aria-label="Close dialog"
+              onClick={onClose}
+            >
+              <X size={20} />
+            </button>
+          )}
         </header>
         {children}
       </div>

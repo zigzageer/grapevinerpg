@@ -9,6 +9,10 @@ import {
   normalizeCharacter,
   characterScale,
   CAST_ADDITIONS,
+  CAST_VERSION_10_ADDITIONS,
+  GRACE,
+  MINT_CREW_LIMIT,
+  TOMMY,
   parseCrew,
   START,
 } from "./model";
@@ -135,16 +139,25 @@ describe("cast updates and saved characters", () => {
         "footjobofsteel",
         "steakbutterfan",
         "blindian",
+        "grace",
+        "tommy",
+        "red-light",
+        "peaches",
+        "lin",
+        "bashu",
+        "orrow",
+        "potato",
+        "kawaiikitty",
       ]);
       expect(migrated.crew[1].name).toBe("Sam");
       expect(migrated).toMatchObject({
         greeted: true,
         inspected: true,
         player: { x: 720, y: 560 },
-        castVersion: 8,
+        castVersion: 10,
       });
       data = JSON.stringify(migrated);
-      expect(loadSave().crew).toHaveLength(18);
+      expect(loadSave().crew).toHaveLength(27);
       // Replacing the imported cast intentionally must not re-add removed characters on every reload.
       data = JSON.stringify({ ...migrated, crew: migrated.crew.slice(0, 3) });
       expect(loadSave().crew).toHaveLength(3);
@@ -165,7 +178,7 @@ describe("cast updates and saved characters", () => {
     });
     try {
       const migrated = loadSave();
-      expect(migrated.crew).toHaveLength(18);
+      expect(migrated.crew).toHaveLength(27);
       expect(migrated.crew[3]).toMatchObject({
         name: "Sammy",
         preset: "baguette-guy",
@@ -188,6 +201,65 @@ describe("cast updates and saved characters", () => {
       vi.unstubAllGlobals();
     }
   });
+});
+
+it.each([8, 9])(
+  "expands a full version %i save without replacing characters",
+  (castVersion) => {
+    const additions =
+      castVersion === 8
+        ? [GRACE, TOMMY, ...CAST_VERSION_10_ADDITIONS]
+        : CAST_VERSION_10_ADDITIONS;
+    const addedIds = new Set(additions.map((character) => character.id));
+    const crew = DEFAULT_CREW.filter(
+      (character) => !addedIds.has(character.id),
+    ).map((character) =>
+      character.id === "friend-5" ? { ...character, name: "Dave" } : character,
+    );
+    while (crew.length < 24) {
+      crew.push({
+        ...DEFAULT_CREW[1],
+        id: `custom-${crew.length}`,
+        name: `My Friend ${crew.length}`,
+      });
+    }
+    const previous = {
+      ...initialSave(),
+      castVersion,
+      activeCharacter: "friend-5",
+      player: { x: 720, y: 560 },
+      crew,
+    };
+    let data = JSON.stringify(previous);
+    vi.stubGlobal("localStorage", { getItem: () => data });
+    try {
+      const migrated = loadSave();
+      expect(migrated).toMatchObject({
+        castVersion: 10,
+        activeCharacter: previous.activeCharacter,
+        player: previous.player,
+      });
+      expect(
+        migrated.crew.filter((character) => addedIds.has(character.id)),
+      ).toMatchObject(additions);
+      expect(migrated.crew.slice(0, crew.length)).toMatchObject(crew);
+      expect(migrated.crew).toHaveLength(24 + additions.length);
+      data = JSON.stringify(migrated);
+      expect(loadSave().crew).toMatchObject(migrated.crew);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  },
+);
+
+it("imports up to forty characters into the Mint crew", () => {
+  const crew = Array.from({ length: MINT_CREW_LIMIT + 2 }, (_, index) => ({
+    ...DEFAULT_CREW[1],
+    id: `custom-${index}`,
+  }));
+  const imported = parseCrew(crew);
+  expect(imported).toHaveLength(40);
+  expect(imported.at(-1)?.id).toBe("custom-39");
 });
 
 it("large movement updates cannot skip through school walls", () => {

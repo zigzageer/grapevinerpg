@@ -23,9 +23,6 @@ for (const size of [
       width: size.width,
       height: size.height,
     });
-    await page
-      .getByRole("button", { name: "Choose characters", exact: true })
-      .tap();
     await page.getByLabel("Find a character").fill("Genesis");
     await page
       .getByRole("group", { name: "Character selection" })

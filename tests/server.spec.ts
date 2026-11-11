@@ -43,23 +43,19 @@ test("empty server stays empty and becomes playable when a new character publish
   await page.keyboard.press("d");
   game = { ...game, updatedAt: "2026-01-02", characters: [character()] };
   await page.getByRole("button", { name: "Check for updates" }).click();
-  await expect(page.getByTestId("active-character-name")).toHaveText(
-    "Server Bob",
-  );
-  await page
-    .getByRole("button", { name: "Choose characters", exact: true })
-    .click();
+  await expect(page.getByRole("dialog", { name: "Choose a character" })).toBeVisible();
+  await expect(page.getByTestId("player-sprite")).toHaveCount(0);
   await expect(
     page
       .getByRole("group", { name: "Character selection" })
-      .getByRole("button"),
+      .getByRole("button", { name: /^Play as / }),
   ).toHaveCount(1);
   await expect(
     page.getByRole("button", { name: "Character workshop" }),
   ).toHaveCount(0);
   await page
     .getByRole("group", { name: "Character selection" })
-    .getByRole("button")
+    .getByRole("button", { name: "Play as Server Bob", exact: true })
     .click();
   const sprite = page.getByTestId("player-sprite");
   const x = Number(await sprite.getAttribute("data-x"));
@@ -89,6 +85,7 @@ test("server saves are isolated from Mint and other servers; later roster update
     }),
   );
   await page.goto(`/${game.slug}`);
+  await page.getByRole("button", { name: "Play as Server Bob", exact: true }).click();
   await expect(page.getByTestId("active-character-name")).toHaveText(
     "Server Bob",
   );
@@ -122,7 +119,7 @@ test("server saves are isolated from Mint and other servers; later roster update
   await expect(
     page
       .getByRole("group", { name: "Character selection" })
-      .getByRole("button"),
+      .getByRole("button", { name: /^Play as / }),
   ).toHaveCount(2);
   await page
     .getByRole("group", { name: "Character selection" })
@@ -132,6 +129,7 @@ test("server saves are isolated from Mint and other servers; later roster update
     Number(await page.getByTestId("player-sprite").getAttribute("data-x")),
   ).toBeCloseTo(x, 0);
   await page.goto(`/test-lounge-${OTHER}`);
+  await page.getByRole("button", { name: "Play as Other Bob", exact: true }).click();
   await expect(page.getByTestId("active-character-name")).toHaveText(
     "Other Bob",
   );
@@ -140,6 +138,7 @@ test("server saves are isolated from Mint and other servers; later roster update
     "true",
   );
   await page.goto("/");
+  await page.getByRole("button", { name: "Play as Mint", exact: true }).click();
   await expect(page.getByTestId("active-character-name")).toHaveText("Mint");
   await page.goto(`/${game.slug}`);
   await expect(page.getByTestId("active-character-name")).toHaveText(
@@ -177,6 +176,7 @@ for (const viewport of [
       route.fulfill({ json: { ...makeGame(), characters: [character()] } }),
     );
     await page.goto(`/test-lounge-${GUILD}`);
+    await page.getByRole("button", { name: "Play as Server Bob", exact: true }).click();
     await expect(page.getByTestId("active-character-name")).toHaveText(
       "Server Bob",
     );

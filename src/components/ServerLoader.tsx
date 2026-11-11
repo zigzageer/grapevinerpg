@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { RefreshCw, Users } from "lucide-react";
+import { Plus, RefreshCw, Users } from "lucide-react";
 import {
   parseServerGame,
   serverIdFromPath,
@@ -121,7 +121,7 @@ export function ServerLoader({
               className="button primary"
               onClick={() => setStudioOpen(true)}
             >
-              Add yourself
+              <Plus size={16} /> Add character
             </button>
             <code>Or use /game add user:@friend in Discord</code>
             <p className="server-hint">

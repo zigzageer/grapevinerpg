@@ -2,10 +2,12 @@ import { describe, expect, it } from "vitest";
 import {
   battleReducer,
   createBattle,
+  getMove,
   timingGrade,
   type BattleState,
   type MoveId,
 } from "./combat";
+import { CAST_ADDITIONS, DAVID, DEFAULT_CREW, parseCrew } from "./model";
 
 function hit(state: BattleState, move: MoveId) {
   return battleReducer(battleReducer(state, { type: "choose", move }), {
@@ -115,5 +117,112 @@ describe("friendly duels", () => {
       player: { ...battle.player, hp: 0 },
     });
     expect(lost.phase).toBe("defeat");
+  });
+});
+
+describe("signature abilities", () => {
+  const blindian = CAST_ADDITIONS[1];
+
+  it("gives the named cast distinct moves even after renaming or migrating a character", () => {
+    const signatures = DEFAULT_CREW.filter(
+      (character) => character.preset || character.kind === "mint",
+    ).map(
+      (character) => createBattle(character, "Opponent").player.signature?.name,
+    );
+    expect(signatures).toHaveLength(25);
+    expect(signatures).not.toContain(undefined);
+    expect(new Set(signatures).size).toBe(25);
+    const renamed = { ...DAVID, name: "Dave", preset: undefined };
+    const migrated = { ...DAVID, id: "friend-20" };
+    expect(createBattle(renamed, blindian).player.signature?.name).toBe(
+      "Grace",
+    );
+    expect(createBattle(migrated, blindian).player.signature?.name).toBe(
+      "Grace",
+    );
+  });
+
+  it("rolls Grace's hits, spends PP once, and tags the opponent on a timed hit", () => {
+    const battle = createBattle(DAVID, blindian);
+    const chosen = battleReducer(battle, { type: "choose", move: "signature" });
+    expect(chosen.player.pp).toBe(2);
+    const low = battleReducer(chosen, {
+      type: "timing",
+      grade: "good",
+      roll: 0,
+    });
+    const high = battleReducer(chosen, {
+      type: "timing",
+      grade: "good",
+      roll: 0.99,
+    });
+    expect(low.event).toMatchObject({ visual: "grace", hits: 1, tag: "CUCK" });
+    expect(high.event).toMatchObject({ visual: "grace", hits: 3, tag: "CUCK" });
+    expect(high.event?.damage).toBe((low.event?.damage ?? 0) * 3);
+    expect(high.player.pp).toBe(2);
+    expect(
+      battleReducer(chosen, { type: "timing", grade: "miss" }).event?.tag,
+    ).toBeUndefined();
+    const next = { ...chosen, phase: "choose" as const };
+    expect(battleReducer(next, { type: "choose", move: "signature" })).toBe(
+      next,
+    );
+  });
+
+  it("resolves Indian Attack for blindian on either side and keeps signatures separate", () => {
+    const battle = createBattle(DAVID, blindian);
+    const enemyTurn = advance(hit({ ...battle, round: 3 }, "quick"));
+    expect(enemyTurn.move).toBe("signature");
+    expect(enemyTurn.opponent.pp).toBe(2);
+    expect(getMove(enemyTurn.opponent, enemyTurn.move)?.name).toBe(
+      "Indian Attack",
+    );
+    expect(
+      battleReducer(enemyTurn, { type: "timing", grade: "miss" }).event,
+    ).toMatchObject({
+      actor: "opponent",
+      visual: "tag-team",
+      hits: 2,
+    });
+    const playerStrike = hit(createBattle(blindian, DAVID), "signature");
+    expect(playerStrike.event).toMatchObject({
+      actor: "player",
+      visual: "tag-team",
+      hits: 2,
+    });
+    const guest = createBattle("Guest", blindian);
+    expect(battleReducer(guest, { type: "choose", move: "signature" })).toBe(
+      guest,
+    );
+  });
+
+  it("restores a generated move from crew data and uses the selected style's fixed rules", () => {
+    const ability = {
+      name: "Jelly Bean Storm",
+      description: "A handful of jelly beans flies across the road.",
+      style: "projectile",
+      art: "/api/studio/assets/a1a1a1a1-0000-0000-0000-000000000000.png",
+      damage: 10_000,
+    };
+    const [custom] = parseCrew([{ ...DAVID, ability }]);
+    const battle = createBattle(custom, blindian);
+    expect(battle.player.signature).toMatchObject({
+      name: ability.name,
+      visual: ability.style,
+      art: ability.art,
+      cost: 3,
+      damage: 26,
+    });
+    expect(hit(battle, "signature").event?.art).toBe(ability.art);
+    const [invalid] = parseCrew([
+      {
+        ...DAVID,
+        ability: { ...ability, art: "https://example.com/sprite.png" },
+      },
+    ]);
+    expect(invalid.ability).toBeUndefined();
+    expect(createBattle(invalid, blindian).player.signature?.name).toBe(
+      "Grace",
+    );
   });
 });

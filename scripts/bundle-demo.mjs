@@ -12,27 +12,25 @@ const mime = {
   ".woff2": "font/woff2",
   ".png": "image/png",
   ".svg": "image/svg+xml",
+  ".webp": "image/webp",
 };
 const dataURL = (file) =>
   `data:${mime[path.extname(file)] || "application/octet-stream"};base64,${fs.readFileSync(file).toString("base64")}`;
-const artwork = Object.fromEntries(
-  fs
-    .readdirSync(path.join(dist, "characters"))
-    .filter((n) => n.endsWith(".png"))
-    .map((n) => [
-      path.basename(n, ".png"),
-      dataURL(path.join(dist, "characters", n)),
-    ]),
-);
-const scenery = Object.fromEntries(
-  fs
-    .readdirSync(path.join(dist, "scenery"))
-    .filter((n) => n.endsWith(".png"))
-    .map((n) => [
-      path.basename(n, ".png"),
-      dataURL(path.join(dist, "scenery", n)),
-    ]),
-);
+function embedArt(folder, extension) {
+  const directory = path.join(dist, folder);
+  return Object.fromEntries(
+    fs
+      .readdirSync(directory)
+      .filter((name) => name.endsWith(extension))
+      .map((name) => [
+        path.basename(name, extension),
+        dataURL(path.join(directory, name)),
+      ]),
+  );
+}
+const artwork = embedArt("characters", ".png");
+const scenery = embedArt("scenery", ".png");
+const abilities = embedArt("abilities", ".webp");
 const css = fs
   .readFileSync(path.join(dist, cssFile), "utf8")
   .replace(/url\(([^)]+)\)/g, (original, ref) => {
@@ -47,7 +45,7 @@ const css = fs
 const js = fs
   .readFileSync(path.join(dist, jsFile), "utf8")
   .replace(/<\/script/gi, "<\\/script");
-const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Adventures of Mint — Play the Demo</title><link rel="icon" href="${dataURL(path.join(dist, "favicon.svg"))}"><style>${css}</style></head><body><div id="root"></div><script>globalThis.__MINT_ART__=${JSON.stringify(artwork)};globalThis.__MINT_SCENERY__=${JSON.stringify(scenery)};</script><script type="module">${js}</script></body></html>`;
+const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Adventures of Mint — Play the Demo</title><link rel="icon" href="${dataURL(path.join(dist, "favicon.svg"))}"><style>${css}</style></head><body><div id="root"></div><script>globalThis.__MINT_ART__=${JSON.stringify(artwork)};globalThis.__MINT_SCENERY__=${JSON.stringify(scenery)};globalThis.__MINT_ABILITIES__=${JSON.stringify(abilities)};</script><script type="module">${js}</script></body></html>`;
 fs.mkdirSync(path.join(root, "artifacts"), { recursive: true });
 const output = path.join(root, "artifacts", "adventures-of-mint.html");
 fs.writeFileSync(output, html);

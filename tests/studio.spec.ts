@@ -104,23 +104,38 @@ async function studioApi(page: Page) {
       requests.push(input);
       used++;
       const id = input.characterId || `web-${input.requestId}`;
-      const character: Character = {
-        ...crew[1],
-        id,
-        name: input.name,
-        preset: undefined,
-        sprite: `/api/studio/assets/${input.requestId}.png`,
-      };
       const key = `${input.gameId}/${id}`;
       const versions = history.get(key) || {
         currentVersionId: null,
         versions: [],
       };
+      const base = versions.versions.find(
+        (version) =>
+          version.id ===
+          (input.referenceVersionId || versions.currentVersionId),
+      );
+      const character: Character = input.abilityOnly
+        ? { ...base!.character }
+        : {
+            ...(base?.character || crew[1]),
+            id,
+            name: input.name,
+            preset: undefined,
+            sprite: `/api/studio/assets/${input.requestId}.png`,
+          };
+      if (input.abilityPrompt)
+        character.ability = {
+          name: "Coffee Comet",
+          description: "A flying cup of coffee crashes into your opponent.",
+          style: "projectile",
+          art: `/api/studio/assets/${randomUUID()}.png`,
+        };
+      const image = input.abilityOnly ? base!.image : character.sprite!;
       versions.versions.unshift({
         id: input.requestId,
         character,
-        description: input.description,
-        image: character.sprite!,
+        description: input.abilityOnly ? base!.description : input.description,
+        image,
         source: "website",
         createdAt: new Date(Date.UTC(2026, 10, 11, 12, used)).toISOString(),
       });
@@ -133,7 +148,7 @@ async function studioApi(page: Page) {
         result: {
           character,
           versionId: input.requestId,
-          image: character.sprite!,
+          image,
         },
         error: null,
         quota: quota(),
@@ -161,15 +176,11 @@ async function studioApi(page: Page) {
 }
 
 async function openStudio(page: Page) {
-  await page.getByRole("button", { name: "Choose characters", exact: true }).click();
   await page
-    .getByRole("button", { name: "Add / edit character", exact: true })
+    .getByRole("button", { name: "Add character", exact: true })
     .click();
   await expect(
-    page.getByRole("dialog", { name: "Make your character" }),
-  ).toBeVisible();
-  await expect(
-    page.getByText("3 of 3 attempts left", { exact: true }),
+    page.getByRole("dialog", { name: "Add character" }),
   ).toBeVisible();
 }
 
@@ -179,19 +190,20 @@ test("a visitor can add themselves from an uploaded reference, preview, and join
   const api = await studioApi(page);
   await page.goto("/");
   await openStudio(page);
+  await expect(
+    page.getByRole("textbox", { name: "Character name", exact: true }),
+  ).toHaveValue("");
   await page
     .getByRole("textbox", { name: "Character name", exact: true })
     .fill("Nova");
   await page
     .getByRole("textbox", { name: "Appearance details", exact: true })
     .fill("A green winter coat and a red scarf");
-  await page
-    .getByLabel("Reference image", { exact: true })
-    .setInputFiles({
-      name: "reference.png",
-      mimeType: "image/png",
-      buffer: reference,
-    });
+  await page.getByLabel("Reference image", { exact: true }).setInputFiles({
+    name: "reference.png",
+    mimeType: "image/png",
+    buffer: reference,
+  });
   await page
     .getByRole("button", { name: "Generate character", exact: true })
     .click();
@@ -208,18 +220,29 @@ test("a visitor can add themselves from an uploaded reference, preview, and join
   await expect(
     page.getByText("2 of 3 attempts left", { exact: true }),
   ).toBeVisible();
+  await page.getByRole("button", { name: "Close dialog", exact: true }).click();
+  await page.getByRole("button", { name: "Edit Miel", exact: true }).click();
+  const mielEditor = page.getByRole("dialog", {
+    name: "Edit Miel",
+    exact: true,
+  });
+  await expect(mielEditor.getByLabel("Character name")).toBeEnabled();
+  await expect(mielEditor.getByLabel("Character name")).toHaveValue("Miel");
+  await mielEditor.getByRole("button", { name: "Close dialog" }).click();
+  await openStudio(page);
   await page.getByRole("button", { name: "Add to game", exact: true }).click();
   await expect(
     page.getByText("Nova is ready in town.", { exact: true }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Close dialog", exact: true }).click();
-  await page.getByRole("button", { name: "Choose characters", exact: true }).click();
   await page.getByRole("button", { name: "Play as Nova", exact: true }).click();
   await expect(
     page.getByRole("button", { name: "Choose characters", exact: true }),
   ).toBeVisible();
   await page.reload();
-  await page.getByRole("button", { name: "Choose characters", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Choose characters", exact: true })
+    .click();
   await expect(
     page.getByRole("button", { name: "Play as Nova", exact: true }),
   ).toBeVisible();
@@ -230,13 +253,12 @@ test("Miel can refine her details, use all three attempts, and restore her origi
 }) => {
   const api = await studioApi(page);
   await page.goto("/");
-  await openStudio(page);
+  await page.getByRole("button", { name: "Play as Mint", exact: true }).click();
   await page
-    .getByRole("button", { name: "Edit character", exact: true })
+    .getByRole("button", { name: "Choose characters", exact: true })
     .click();
-  await page
-    .getByLabel("Character to edit", { exact: true })
-    .selectOption("friend-8");
+  await page.getByRole("button", { name: "Edit Miel", exact: true }).click();
+  await expect(page.getByRole("dialog", { name: "Edit Miel" })).toBeVisible();
   await expect(
     page.getByRole("textbox", { name: "Appearance details", exact: true }),
   ).toHaveValue("Long brown hair and bunny ears");
@@ -268,6 +290,7 @@ test("Miel can refine her details, use all three attempts, and restore her origi
     page.getByRole("button", { name: "Regenerate", exact: true }),
   ).toBeDisabled();
   expect(api.requests.length).toBe(3);
+  expect(api.requests[0].characterId).toBe("friend-8");
   expect(api.requests[1].useCurrent).toBe(true);
   await page
     .getByRole("button", { name: "Show character history", exact: true })
@@ -292,6 +315,87 @@ test("Miel can refine her details, use all three attempts, and restore her origi
   ).toBeDisabled();
   expect(api.quota().used).toBe(3);
   expect(api.history.get("mint/friend-8")!.versions).toHaveLength(4);
+  await page.getByRole("button", { name: "Close dialog", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Play as Mint", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+});
+
+test("an ability-only preview keeps the sprite and equips the move until history is restored", async ({
+  page,
+}) => {
+  const api = await studioApi(page);
+  await page.goto("/");
+  await page.getByRole("button", { name: "Edit Mint", exact: true }).click();
+  const studio = page.getByRole("dialog", { name: "Edit Mint", exact: true });
+  const original = api.history.get("mint/you")!.versions[0];
+  await studio
+    .getByRole("checkbox", { name: "Keep this version’s appearance" })
+    .check();
+  await expect(
+    studio.getByRole("textbox", { name: "Appearance details" }),
+  ).toBeHidden();
+  await expect(
+    studio.getByRole("button", { name: "Generate ability" }),
+  ).toBeDisabled();
+  await studio
+    .getByRole("textbox", { name: "Signature ability", exact: true })
+    .fill("Throw a paper coffee cup at the opponent.");
+  await studio
+    .getByRole("button", { name: "Generate ability", exact: true })
+    .click();
+  const preview = studio.getByRole("figure", {
+    name: "Signature ability preview",
+  });
+  await expect(preview).toContainText("Coffee Comet");
+  const art = await preview.locator("img").getAttribute("src");
+  expect(art).toMatch(/^\/api\/studio\/assets\/.+\.png$/);
+  await expect(studio.locator(".studio-character-stage image")).toHaveAttribute(
+    "href",
+    "/characters/mint.png",
+  );
+  expect(api.requests[0]).toMatchObject({
+    characterId: "you",
+    abilityOnly: true,
+    referenceVersionId: original.id,
+    abilityPrompt: "Throw a paper coffee cup at the opponent.",
+  });
+  expect(api.requests[0]).not.toHaveProperty("description");
+  expect(api.games.get("mint")!.characters[0].ability).toBeUndefined();
+  await studio.getByRole("button", { name: "Use this version" }).click();
+  await expect(studio.getByText("Mint is ready in town.")).toBeVisible();
+  await studio.getByRole("button", { name: "Close dialog" }).click();
+  await page.getByRole("button", { name: "Play as Mint", exact: true }).click();
+
+  await page
+    .getByRole("button", { name: "Interact with Sarina", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Fight", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Use Peppermint Pop" }),
+  ).toHaveCount(0);
+  await page
+    .getByRole("button", { name: "Use Coffee Comet", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Strike!", exact: true }).click();
+  await expect(
+    page.locator('.duo-stage[data-visual="projectile"] .battle-projectile img'),
+  ).toHaveAttribute("src", art!);
+  await page.getByRole("button", { name: "Leave fight", exact: true }).click();
+
+  await page
+    .getByRole("button", { name: "Choose characters", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Edit Mint", exact: true }).click();
+  await studio.getByRole("button", { name: "Show character history" }).click();
+  await studio.getByRole("button", { name: "Original character" }).click();
+  await expect(preview).toContainText("Peppermint Pop");
+  await studio.getByRole("button", { name: "Use this version" }).click();
+  await expect(
+    studio.getByRole("button", { name: "Current version", exact: true }),
+  ).toBeDisabled();
+  expect(api.games.get("mint")!.characters[0].ability).toBeUndefined();
+  expect(api.quota().used).toBe(1);
 });
 
 for (const viewport of [
@@ -305,7 +409,7 @@ for (const viewport of [
     await studioApi(page);
     await page.goto(`/friends-${GUILD}`);
     await page
-      .getByRole("button", { name: "Add yourself", exact: true })
+      .getByRole("button", { name: "Add character", exact: true })
       .click();
     await expect(
       page.getByText("3 of 3 attempts left", { exact: true }),
@@ -323,14 +427,13 @@ for (const viewport of [
       .getByRole("button", { name: "Add to game", exact: true })
       .click();
     await expect(
-      page.getByRole("button", { name: "Choose characters", exact: true }),
+      page.getByRole("dialog", { name: "Choose a character", exact: true }),
     ).toBeVisible();
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= window.innerWidth,
       ),
     ).toBe(true);
-    await page.getByRole("button", { name: "Choose characters", exact: true }).click();
     await expect(
       page.getByRole("button", { name: "Play as Mobile friend", exact: true }),
     ).toBeVisible();

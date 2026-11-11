@@ -3,15 +3,16 @@ import {
   History,
   ImagePlus,
   LoaderCircle,
-  Plus,
   RotateCcw,
   Sparkles,
+  Swords,
   UserRound,
   X,
 } from "lucide-react";
 import { Modal } from "./Modal";
 import { Portrait } from "./Character";
 import { normalizeCharacter, type Character } from "../game/model";
+import { getSignatureMove } from "../game/abilities";
 import {
   studioRequest,
   StudioRequestError,
@@ -24,7 +25,7 @@ import {
 
 interface Props {
   gameId: string;
-  initialCharacterId?: string;
+  initialCharacter?: Character;
   onClose: () => void;
   onPublished: (game: StudioGame, characterId: string) => void;
 }
@@ -35,24 +36,41 @@ interface ReferenceImage {
   name: string;
 }
 
+function previewCharacter(
+  version: CharacterVersion,
+  gameId: string,
+): Character {
+  const character = normalizeCharacter(version.character);
+  if (
+    /^\d{17,20}$/.test(gameId) &&
+    /^discord-\d{17,20}$/.test(character.id) &&
+    version.character.sprite === `/games/${gameId}/${character.id.slice(8)}.png`
+  ) {
+    return { ...character, sprite: version.character.sprite };
+  }
+  return character;
+}
+
 export function CharacterStudio({
   gameId,
-  initialCharacterId,
+  initialCharacter,
   onClose,
   onPublished,
 }: Props) {
   const [game, setGame] = useState<StudioGame | null>(null);
   const [drafts, setDrafts] = useState<Character[]>([]);
   const [quota, setQuota] = useState<Quota | null>(null);
-  const [mode, setMode] = useState<"add" | "edit">(
-    initialCharacterId ? "edit" : "add",
-  );
-  const [selectedId, setSelectedId] = useState(initialCharacterId || "");
-  const [name, setName] = useState("");
+  const [selectedId, setSelectedId] = useState(initialCharacter?.id ?? "");
+  const [name, setName] = useState(initialCharacter?.name || "");
   const [description, setDescription] = useState("");
+  const [abilityPrompt, setAbilityPrompt] = useState("");
+  const [abilityOnly, setAbilityOnly] = useState(false);
   const [image, setImage] = useState<ReferenceImage | null>(null);
   const [useCurrent, setUseCurrent] = useState(true);
   const [history, setHistory] = useState<CharacterHistory | null>(null);
+  const [loadingHistory, setLoadingHistory] = useState(
+    Boolean(initialCharacter),
+  );
   const [showHistory, setShowHistory] = useState(false);
   const [preview, setPreview] = useState<CharacterVersion | null>(null);
   const [job, setJob] = useState<GenerationJob | null>(null);
@@ -67,23 +85,36 @@ export function CharacterStudio({
   const fileRef = useRef<HTMLInputElement>(null);
   const storageKey = `mint.studio.job.${gameId}`;
   const busy = readingImage || submitting || Boolean(pendingId);
-  const characters = [
-    ...(game?.characters || []),
-    ...drafts.filter(
-      (draft) => !game?.characters.some((c) => c.id === draft.id),
-    ),
-  ];
+  const editing = Boolean(selectedId);
+  const moveOnly = editing && abilityOnly;
+  const previewMove = preview && getSignatureMove(preview.character);
+  const unpublished = drafts.filter(
+    (draft) => !game?.characters.some((c) => c.id === draft.id),
+  );
+  const selectedDraft = unpublished.find((draft) => draft.id === selectedId);
+  const formDisabled =
+    busy ||
+    applying ||
+    loadingHistory ||
+    (editing && !history) ||
+    !game ||
+    !quota;
 
   const loadCharacter = useCallback(
     async (character: Character, preferredVersion?: string) => {
       const token = ++selection.current;
-      setMode("edit");
       setSelectedId(character.id);
       setName(character.name);
       setDescription("");
       setHistory(null);
+      setLoadingHistory(true);
+      setShowHistory(false);
       setPreview(null);
       setUseCurrent(true);
+      if (!preferredVersion) {
+        setAbilityOnly(false);
+        setAbilityPrompt("");
+      }
       setError("");
       setMessage("");
       try {
@@ -103,6 +134,8 @@ export function CharacterStudio({
         }
       } catch (e) {
         if (selection.current === token) setError((e as Error).message);
+      } finally {
+        if (selection.current === token) setLoadingHistory(false);
       }
     },
     [gameId],
@@ -111,6 +144,7 @@ export function CharacterStudio({
   useEffect(() => {
     let disposed = false;
     const controller = new AbortController();
+    if (initialCharacter) void loadCharacter(initialCharacter);
     Promise.allSettled([
       studioRequest<StudioGame>(
         `/games/${gameId}`,
@@ -118,21 +152,18 @@ export function CharacterStudio({
         controller.signal,
       ),
       studioRequest<Quota>("/quota", undefined, controller.signal),
-      studioRequest<Character[]>(
-        `/drafts/${gameId}`,
-        undefined,
-        controller.signal,
-      ),
+      initialCharacter
+        ? Promise.resolve([])
+        : studioRequest<Character[]>(
+            `/drafts/${gameId}`,
+            undefined,
+            controller.signal,
+          ),
     ]).then((results) => {
       if (disposed) return;
       const [town, allowance, savedDrafts] = results;
-      if (town.status === "fulfilled") {
-        setGame(town.value);
-        const current = town.value.characters.find(
-          (c) => c.id === initialCharacterId,
-        );
-        if (current) void loadCharacter(current);
-      } else
+      if (town.status === "fulfilled") setGame(town.value);
+      else
         setError(
           town.reason instanceof Error
             ? town.reason.message
@@ -156,7 +187,7 @@ export function CharacterStudio({
       controller.abort();
       selection.current++;
     };
-  }, [gameId, initialCharacterId, reload, loadCharacter, storageKey]);
+  }, [gameId, initialCharacter, reload, loadCharacter, storageKey]);
 
   useEffect(() => {
     if (!pendingId) return;
@@ -170,6 +201,16 @@ export function CharacterStudio({
           controller.signal,
         );
         if (controller.signal.aborted) return;
+        // A saved job belongs to its own character, even when a different
+        // character's editor is opened before that job finishes.
+        if (
+          selectedId
+            ? next.characterId !== selectedId
+            : game?.characters.some((c) => c.id === next.characterId)
+        ) {
+          setPendingId(null);
+          return;
+        }
         setJob(next);
         setQuota(next.quota);
         if (next.status === "succeeded" && next.result) {
@@ -220,20 +261,22 @@ export function CharacterStudio({
       controller.abort();
       clearTimeout(timer);
     };
-  }, [pendingId, gameId, loadCharacter, storageKey]);
+  }, [pendingId, game, loadCharacter, selectedId, storageKey]);
 
   const clearImage = () => {
     setImage(null);
     if (fileRef.current) fileRef.current.value = "";
   };
-  const addMyself = () => {
+  const startNew = () => {
     selection.current++;
-    setMode("add");
     setSelectedId("");
     setName("");
     setDescription("");
+    setAbilityOnly(false);
+    setAbilityPrompt("");
     setPreview(null);
     setHistory(null);
+    setLoadingHistory(false);
     setShowHistory(false);
     setError("");
     setMessage("");
@@ -274,7 +317,13 @@ export function CharacterStudio({
 
   const generate = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (busy || !quota?.remaining || !game) return;
+    const prompt = abilityPrompt.trim();
+    if (
+      formDisabled ||
+      (moveOnly && (!preview || !prompt)) ||
+      !quota?.remaining
+    )
+      return;
     setSubmitting(true);
     setError("");
     setMessage("");
@@ -283,14 +332,19 @@ export function CharacterStudio({
       const next = await studioRequest<GenerationJob>("/generations", {
         requestId,
         gameId,
-        ...(mode === "edit" ? { characterId: selectedId } : {}),
-        name: name.trim(),
-        description,
-        useCurrent: mode === "edit" && useCurrent,
-        ...(mode === "edit" && preview
-          ? { referenceVersionId: preview.id }
+        ...(editing ? { characterId: selectedId } : {}),
+        ...(moveOnly
+          ? { abilityOnly: true }
+          : {
+              name: name.trim(),
+              description,
+              useCurrent: editing && useCurrent,
+            }),
+        ...(prompt ? { abilityPrompt: prompt } : {}),
+        ...(editing && preview ? { referenceVersionId: preview.id } : {}),
+        ...(!moveOnly && image
+          ? { image: { type: image.type, base64: image.base64 } }
           : {}),
-        ...(image ? { image: { type: image.type, base64: image.base64 } } : {}),
       });
       try {
         localStorage.setItem(storageKey, next.id);
@@ -339,7 +393,8 @@ export function CharacterStudio({
       );
       setMessage(`${preview.character.name} is ready in town.`);
       try {
-        localStorage.removeItem(storageKey);
+        if (job?.characterId === selectedId)
+          localStorage.removeItem(storageKey);
       } catch {
         /* Optional device storage. */
       }
@@ -353,142 +408,142 @@ export function CharacterStudio({
 
   return (
     <Modal
-      title="Make your character"
+      title={
+        initialCharacter ? `Edit ${initialCharacter.name}` : "Add character"
+      }
       className="game-modal studio-modal"
       onClose={onClose}
       wide
     >
-      <div className="studio-heading-row">
-        <div className="studio-modes" aria-label="Character creation mode">
-          <button
-            className={mode === "add" ? "selected" : ""}
-            disabled={busy || !game}
-            onClick={addMyself}
-          >
-            <Plus size={16} /> Add myself
-          </button>
-          <button
-            className={mode === "edit" ? "selected" : ""}
-            disabled={busy || !characters.length}
-            onClick={() => {
-              const character =
-                characters.find((c) => c.id === selectedId) || characters[0];
-              if (character) {
-                clearImage();
-                void loadCharacter(character);
-              }
-            }}
-          >
-            <UserRound size={16} /> Edit character
-          </button>
-        </div>
-        <span className="studio-quota" aria-live="polite">
-          {quota
-            ? `${quota.remaining} of ${quota.limit} attempts left`
-            : "Checking attempts…"}
-        </span>
-      </div>
+      <span className="studio-quota" aria-live="polite">
+        {quota
+          ? `${quota.remaining} of ${quota.limit} attempts left`
+          : "Checking attempts…"}
+      </span>
       <p className="studio-allowance">
-        Three generation attempts per IP address across this site. Adding,
-        editing, and regenerating each use one attempt. Saved versions can be
-        restored for free.
+        Three generation attempts per IP across all towns. An appearance and a
+        signature ability can share one attempt. Restoring a saved version is
+        free.
       </p>
       <div className="studio-layout">
         <form className="studio-form" onSubmit={generate}>
-          <fieldset disabled={busy || applying || !game || !quota}>
-            {mode === "edit" && (
-              <label className="field">
-                Character
+          {!initialCharacter &&
+            unpublished.length > 0 &&
+            (!editing || selectedDraft) && (
+              <label className="field studio-drafts">
+                Saved drafts
                 <select
-                  aria-label="Character to edit"
-                  value={selectedId}
+                  disabled={busy || applying || !game}
+                  value={selectedDraft?.id ?? ""}
                   onChange={(event) => {
-                    const character = characters.find(
+                    const draft = unpublished.find(
                       (c) => c.id === event.target.value,
                     );
-                    if (character) {
+                    if (draft) {
                       clearImage();
-                      void loadCharacter(character);
-                    }
+                      void loadCharacter(draft);
+                    } else startNew();
                   }}
                 >
-                  {!selectedId && <option value="">Choose a character</option>}
-                  {characters.map((c) => (
+                  <option value="">New character</option>
+                  {unpublished.map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.name}
-                      {game?.characters.some((item) => item.id === c.id)
-                        ? ""
-                        : " (saved draft)"}
                     </option>
                   ))}
                 </select>
               </label>
             )}
-            <label className="field">
-              Character name
-              <input
-                aria-label="Character name"
-                required
-                maxLength={28}
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-                placeholder="Your name"
-              />
-            </label>
-            <label className="field">
-              Appearance details
-              <textarea
-                aria-label="Appearance details"
-                maxLength={1000}
-                rows={5}
-                value={description}
-                onChange={(event) => setDescription(event.target.value)}
-                placeholder="Hair, clothes, accessories, and anything you’d like to change…"
-              />
-            </label>
-            {mode === "edit" && (
+          <fieldset disabled={formDisabled}>
+            {editing && preview && (
               <label className="studio-checkbox">
                 <input
                   type="checkbox"
-                  checked={useCurrent}
-                  onChange={(event) => setUseCurrent(event.target.checked)}
-                />{" "}
-                Use this character as a reference
+                  checked={abilityOnly}
+                  onChange={(event) => setAbilityOnly(event.target.checked)}
+                />
+                Keep this version’s appearance
               </label>
             )}
-            <label className="studio-upload">
-              <ImagePlus size={19} />
-              <span>
-                {image ? image.name : "Upload a reference image"}
-                <small>PNG, JPEG, or WebP · up to 2 MB</small>
-              </span>
-              <input
-                ref={fileRef}
-                aria-label="Reference image"
-                type="file"
-                accept="image/png,image/jpeg,image/webp"
-                onChange={(event) => void upload(event.target.files?.[0])}
+            <div className="studio-appearance" hidden={moveOnly}>
+              <label className="field">
+                Character name
+                <input
+                  aria-label="Character name"
+                  required
+                  disabled={moveOnly}
+                  maxLength={28}
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                  placeholder="Character name"
+                />
+              </label>
+              <label className="field">
+                Appearance details
+                <textarea
+                  aria-label="Appearance details"
+                  maxLength={1000}
+                  rows={5}
+                  value={description}
+                  onChange={(event) => setDescription(event.target.value)}
+                  placeholder="Hair, clothes, accessories, and anything you’d like to change…"
+                />
+              </label>
+              {editing && (
+                <label className="studio-checkbox">
+                  <input
+                    type="checkbox"
+                    checked={useCurrent}
+                    onChange={(event) => setUseCurrent(event.target.checked)}
+                  />{" "}
+                  Use this character as a reference
+                </label>
+              )}
+              <label className="studio-upload">
+                <ImagePlus size={19} />
+                <span>
+                  {image ? image.name : "Upload a reference image"}
+                  <small>PNG, JPEG, or WebP · up to 2 MB</small>
+                </span>
+                <input
+                  ref={fileRef}
+                  aria-label="Reference image"
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  onChange={(event) => void upload(event.target.files?.[0])}
+                />
+              </label>
+              {image && (
+                <div className="studio-reference">
+                  <img src={image.preview} alt="Uploaded character reference" />
+                  <button
+                    className="text-button"
+                    type="button"
+                    onClick={clearImage}
+                  >
+                    <X size={14} /> Remove reference
+                  </button>
+                </div>
+              )}
+            </div>
+            <label className="field">
+              Signature ability{!moveOnly && " (optional)"}
+              <textarea
+                aria-label="Signature ability"
+                required={moveOnly}
+                maxLength={500}
+                rows={3}
+                value={abilityPrompt}
+                onChange={(event) => setAbilityPrompt(event.target.value)}
+                placeholder="Describe what the move does and what it looks like."
               />
             </label>
-            {image && (
-              <div className="studio-reference">
-                <img src={image.preview} alt="Uploaded character reference" />
-                <button
-                  className="text-button"
-                  type="button"
-                  onClick={clearImage}
-                >
-                  <X size={14} /> Remove reference
-                </button>
-              </div>
-            )}
             <button
               className="button primary studio-generate"
               type="submit"
               disabled={
                 !quota?.remaining ||
-                !name.trim() ||
-                (mode === "edit" && !selectedId)
+                (moveOnly ? !abilityPrompt.trim() : !name.trim())
               }
             >
               {busy ? (
@@ -502,11 +557,13 @@ export function CharacterStudio({
                 ? "Reading reference…"
                 : busy
                   ? "Generating…"
-                  : preview?.source === "website"
-                    ? "Regenerate"
-                    : mode === "edit"
-                      ? "Generate new version"
-                      : "Generate character"}
+                  : moveOnly
+                    ? "Generate ability"
+                    : preview?.source === "website"
+                      ? "Regenerate"
+                      : editing
+                        ? "Generate new version"
+                        : "Generate character"}
             </button>
           </fieldset>
         </form>
@@ -515,25 +572,40 @@ export function CharacterStudio({
             className={`studio-character-stage ${preview ? "" : "studio-stage-empty"}`}
           >
             {preview ? (
-              <Portrait
-                c={normalizeCharacter({
-                  ...preview.character,
-                  sprite: preview.image || preview.character.sprite,
-                })}
-              />
+              <Portrait c={previewCharacter(preview, gameId)} />
             ) : (
               <UserRound size={68} strokeWidth={1.2} />
             )}
           </div>
           <strong>{preview?.character.name || name || "Your character"}</strong>
+          {previewMove && (
+            <figure
+              className="studio-ability"
+              aria-label="Signature ability preview"
+            >
+              <span className="studio-ability-icon">
+                {previewMove.art ? (
+                  <img src={previewMove.art} alt="" />
+                ) : (
+                  <Swords size={22} />
+                )}
+              </span>
+              <figcaption>
+                <strong>{previewMove.name}</strong>
+                <span>
+                  {previewMove.cost} PP · {previewMove.description}
+                </span>
+              </figcaption>
+            </figure>
+          )}
           {busy && (
             <p className="studio-progress" role="status">
               <LoaderCircle size={16} className="studio-spinning" />
               {readingImage
                 ? "Reading your reference…"
                 : job?.status === "running"
-                  ? "Codex is creating your character…"
-                  : "Your character is queued…"}
+                  ? "Codex is creating your preview…"
+                  : "Your preview is queued…"}
             </p>
           )}
           {preview && (
@@ -576,12 +648,14 @@ export function CharacterStudio({
           {error}
         </p>
       )}
-      {(!game || !quota) && (
+      {(!game || !quota || (editing && !loadingHistory && !history)) && (
         <button
           className="button secondary"
           onClick={() => {
             setError("");
-            setReload((old) => old + 1);
+            if (game && quota && selectedDraft)
+              void loadCharacter(selectedDraft);
+            else setReload((old) => old + 1);
           }}
         >
           Reconnect studio
@@ -609,12 +683,7 @@ export function CharacterStudio({
                 }}
               >
                 <span className="studio-version-art">
-                  <Portrait
-                    c={normalizeCharacter({
-                      ...version.character,
-                      sprite: version.image || version.character.sprite,
-                    })}
-                  />
+                  <Portrait c={previewCharacter(version, gameId)} />
                 </span>
                 <strong>
                   {version.source === "original"
@@ -625,6 +694,9 @@ export function CharacterStudio({
                   <span>Current version</span>
                 )}
                 {version.description && <p>{version.description}</p>}
+                {version.character.ability && (
+                  <p>{version.character.ability.name}</p>
+                )}
               </button>
             ))}
           </div>

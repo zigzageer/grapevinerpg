@@ -12,6 +12,7 @@ import {
   Menu,
   Pencil,
   Play,
+  Plus,
   RotateCcw,
   Search,
   Smartphone,
@@ -23,7 +24,10 @@ import {
 import type { Character, Point, SaveGame } from "./game/model";
 import {
   characterKey,
+  createCrewMember,
+  DEFAULT_CREW,
   loadSave,
+  MINT_CREW_LIMIT,
   movePlayerInSteps,
   SAVE_KEY,
   START,
@@ -61,12 +65,13 @@ type Panel =
   | null;
 function loadDemo(): SaveGame {
   const saved = loadSave();
+  const crew = saved.crew.filter(
+    (c) => c.preset || c.sprite || !["Friend 01", "Friend 02"].includes(c.name),
+  );
   return {
     ...saved,
-    crew: saved.crew.filter(
-      (c) =>
-        c.preset || c.sprite || !["Friend 01", "Friend 02"].includes(c.name),
-    ),
+    crew,
+    activeCharacter: crew.find((c) => c.id === saved.activeCharacter)?.id,
   };
 }
 
@@ -89,17 +94,18 @@ function Game({ server }: { server?: ServerGame }) {
   const [moving, setMoving] = useState(false),
     [facing, setFacing] = useState(1),
     [target, setTarget] = useState<Point | null>(null);
-  const [panel, setPanel] = useState<Panel>(null),
+  const [openPanel, setPanel] = useState<Panel>(null),
     [search, setSearch] = useState("");
   const sharedUpdatedAt = useRef(0);
-  const [studioCharacter, setStudioCharacter] = useState<string | undefined>();
+  const [studioCrew, setStudioCrew] = useState<Character[] | null>();
+  const [editorCharacter, setEditorCharacter] = useState<Character>();
   const [interaction, setInteraction] = useState<{
     actor: Character;
     other: Character;
   } | null>(null);
   const [zoom, setZoom] = useState(DEFAULT_ZOOM),
     [toast, setToast] = useState(""),
-    [saved, setSaved] = useState<"saved" | "saving" | "failed">("saved"),
+    [saved, setSaved] = useState<"saved" | "failed">("saved"),
     [running, setRunning] = useState(false),
     [inputReset, setInputReset] = useState(0);
   const position = useRef(player),
@@ -123,11 +129,11 @@ function Game({ server }: { server?: ServerGame }) {
   );
   const selectRef = useRef<(direction: number) => void>(() => {}),
     openRef = useRef<(p: Exclude<Panel, null>) => void>(() => {});
-  const active =
-      game.crew.find((c) => characterKey(c) === game.activeCharacter) ||
-      game.crew[0],
-    activeKey = characterKey(active),
-    tvLook = game.tvLook !== false;
+  const active = game.crew.find((c) => c.id === game.activeCharacter);
+  const activeKey = active?.id ?? "";
+  const panel = openPanel ?? (active ? null : "characters");
+  const tvLook = game.tvLook !== false;
+  const canUseStudio = studioAvailable() && (!!server || studioCrew !== null);
   state.current = game;
   blocked.current = !!panel;
   const notify = useCallback((message: string) => {
@@ -169,9 +175,33 @@ function Game({ server }: { server?: ServerGame }) {
     [stop],
   );
   openRef.current = open;
-  const openStudio = (characterId?: string) => {
-    setStudioCharacter(characterId);
-    open("studio");
+  const openWorkshop = () => {
+    setEditorCharacter(undefined);
+    open("crew");
+  };
+  const editCharacter = (character: Character) => {
+    setEditorCharacter(character);
+    const inStudio =
+      server ||
+      (studioCrew ?? DEFAULT_CREW).some(
+        (c) =>
+          c.id === character.id &&
+          (c.preset === character.preset ||
+            character.sprite?.startsWith("/api/studio/assets/")),
+      );
+    setPanel(canUseStudio && inStudio ? "studio" : "crew");
+  };
+  const addCharacter = () => {
+    setSearch("");
+    if (canUseStudio) {
+      setEditorCharacter(undefined);
+      setPanel("studio");
+    } else if (game.crew.length < MINT_CREW_LIMIT) {
+      const character = createCrewMember(game.crew.length);
+      setGame((current) => ({ ...current, crew: [...current.crew, character] }));
+      setEditorCharacter(character);
+      setPanel("crew");
+    }
   };
   const walkTo = (point: Point) => {
     const route = findPath(position.current, point);
@@ -203,7 +233,7 @@ function Game({ server }: { server?: ServerGame }) {
       crew: server.characters,
       activeCharacter: server.characters.some((c) => c.id === g.activeCharacter)
         ? g.activeCharacter
-        : server.characters[0]?.id,
+        : undefined,
     }));
   }, [server]);
   useEffect(() => {
@@ -222,6 +252,7 @@ function Game({ server }: { server?: ServerGame }) {
         )
           return;
         sharedUpdatedAt.current = Date.parse(shared.updatedAt);
+        setStudioCrew(shared.characters);
         const applied = readAppliedVersions();
         setGame((current) => {
           const crew = mergeStudioCrew(current.crew, shared, applied);
@@ -229,6 +260,8 @@ function Game({ server }: { server?: ServerGame }) {
         });
         rememberAppliedVersions(shared);
       } catch {
+        if (!controller.signal.aborted)
+          setStudioCrew((current) => current ?? null);
         /* The existing cast and browser saves remain playable during a connection failure. */
       }
     };
@@ -415,12 +448,11 @@ function Game({ server }: { server?: ServerGame }) {
     };
   }, []);
   useEffect(() => {
-    setSaved("saving");
     const timeout = setTimeout(() => {
       try {
         localStorage.setItem(
           saveKey,
-          JSON.stringify({ ...game, player, activeCharacter: activeKey }),
+          JSON.stringify({ ...game, player }),
         );
         setSaved("saved");
       } catch {
@@ -428,7 +460,7 @@ function Game({ server }: { server?: ServerGame }) {
       }
     }, 350);
     return () => clearTimeout(timeout);
-  }, [game, player, activeKey, saveKey]);
+  }, [game, player, saveKey]);
   useEffect(() => {
     const save = () => {
       try {
@@ -496,6 +528,7 @@ function Game({ server }: { server?: ServerGame }) {
                 if (!blocked.current) walkTo(point);
               }}
               onSelect={(other) => {
+                if (!active) return;
                 setInteraction({ actor: active, other });
                 open("interact");
               }}
@@ -509,7 +542,7 @@ function Game({ server }: { server?: ServerGame }) {
             </div>
           )}
         </div>
-        <div className="game-hud">
+        <div className="game-hud" hidden={!active}>
           <header className="game-topbar">
             <button
               className="hud-player"
@@ -517,12 +550,12 @@ function Game({ server }: { server?: ServerGame }) {
               aria-label="Choose character"
             >
               <span className="hud-avatar">
-                <Portrait c={active} />
+                {active && <Portrait c={active} />}
               </span>
               <span className="hud-player-info">
                 <span className="hud-caption">{title.toUpperCase()}</span>
                 <strong data-testid="active-character-name" aria-live="polite">
-                  {active.name}
+                  {active?.name}
                 </strong>
                 <span className="hud-player-place">
                   <MapPin size={10} /> {townName}
@@ -628,65 +661,79 @@ function Game({ server }: { server?: ServerGame }) {
       )}
       {panel === "characters" && (
         <Modal
-          title="Who’s taking a walk?"
-          eyebrow="CHOOSE YOUR CHARACTER"
+          title="Choose a character"
           className="game-modal character-picker-modal"
-          onClose={() => setPanel(null)}
+          onClose={active ? () => setPanel(null) : undefined}
           wide
         >
-          <label className="picker-search">
-            <Search size={17} />
-            <input
-              autoComplete="off"
-              aria-label="Find a character"
-              placeholder="Find your character…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-            <span>{game.crew.length}</span>
-          </label>
+          <div className="picker-toolbar">
+            <label className="picker-search">
+              <Search size={17} />
+              <input
+                autoComplete="off"
+                aria-label="Find a character"
+                placeholder="Find a character…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </label>
+            <button
+              className="button primary picker-add"
+              aria-label="Add character"
+              title="Add character"
+              disabled={!canUseStudio && game.crew.length >= MINT_CREW_LIMIT}
+              onClick={addCharacter}
+            >
+              <Plus size={21} aria-hidden="true" />
+            </button>
+          </div>
           <div
             className="picker-grid"
             role="group"
             aria-label="Character selection"
           >
-            {filtered.map((c) => (
-              <button
-                key={c.id}
-                className={`picker-character ${characterKey(c) === activeKey ? "selected" : ""}`}
-                aria-label={`Play as ${c.name}`}
-                aria-pressed={characterKey(c) === activeKey}
-                onClick={() => choose(c)}
-              >
-                <span className="picker-portrait">
-                  <Portrait c={c} />
-                </span>
-                <strong>{c.name}</strong>
-                {characterKey(c) === activeKey && (
-                  <span className="picker-check">
-                    <Check size={14} />
-                  </span>
-                )}
-              </button>
-            ))}
+            {filtered.map((c) => {
+              const selected = c.id === activeKey;
+              return (
+                <div className="picker-card" key={c.id}>
+                  <button
+                    className={`picker-character ${selected ? "selected" : ""}`}
+                    aria-label={`Play as ${c.name}`}
+                    aria-pressed={selected}
+                    onClick={() => choose(c)}
+                  >
+                    <span className="picker-portrait">
+                      <Portrait c={c} />
+                    </span>
+                    <strong>{c.name}</strong>
+                    {selected && (
+                      <span className="picker-check">
+                        <Check size={14} />
+                      </span>
+                    )}
+                  </button>
+                  <button
+                    className="picker-edit"
+                    aria-label={`Edit ${c.name}`}
+                    title={`Edit ${c.name}`}
+                    onClick={() => editCharacter(c)}
+                  >
+                    <Pencil size={15} aria-hidden="true" />
+                  </button>
+                </div>
+              );
+            })}
             {!filtered.length && (
               <p className="picker-empty">No one by that name.</p>
             )}
           </div>
-          <footer className="picker-footer">
-            {studioAvailable() && (
-              <button className="button primary" onClick={() => openStudio()}>
-                <Sparkles size={16} /> Add / edit character
-              </button>
-            )}
-            {!server && (
-              <button className="button secondary" onClick={() => open("crew")}>
+          {!server && (
+            <footer className="picker-footer">
+              <button className="button secondary" onClick={openWorkshop}>
                 <Pencil size={15} /> Character workshop
               </button>
-            )}
-
-            <span>Tap someone in town to fight or kiss.</span>
-          </footer>
+            </footer>
+          )}
         </Modal>
       )}
       {panel === "map" && (
@@ -718,15 +765,8 @@ function Game({ server }: { server?: ServerGame }) {
               <span>Choose character</span>
               <ChevronRight size={17} />
             </button>
-            {studioAvailable() && (
-              <button onClick={() => openStudio(activeKey)}>
-                <Sparkles size={19} />
-                <span>Add / edit character</span>
-                <ChevronRight size={17} />
-              </button>
-            )}
             {!server && (
-              <button onClick={() => open("crew")}>
+              <button onClick={openWorkshop}>
                 <Pencil size={19} />
                 <span>Character workshop</span>
                 <ChevronRight size={17} />
@@ -782,8 +822,8 @@ function Game({ server }: { server?: ServerGame }) {
       {panel === "studio" && (
         <CharacterStudio
           gameId={server?.guildId || "mint"}
-          initialCharacterId={studioCharacter}
-          onClose={() => setPanel(null)}
+          initialCharacter={editorCharacter}
+          onClose={() => setPanel("characters")}
           onPublished={(shared, characterId) => {
             sharedUpdatedAt.current = Date.parse(shared.updatedAt);
             const applied = readAppliedVersions();
@@ -794,8 +834,11 @@ function Game({ server }: { server?: ServerGame }) {
                 ? shared.characters
                 : mergeStudioCrew(current.crew, shared, applied),
             }));
-            if (!server) rememberAppliedVersions(shared);
-            notify("Character saved. Choose them from Characters.");
+            if (!server) {
+              setStudioCrew(shared.characters);
+              rememberAppliedVersions(shared);
+            }
+            notify("Character saved.");
           }}
         />
       )}
@@ -803,6 +846,7 @@ function Game({ server }: { server?: ServerGame }) {
         <CharacterInteraction
           actor={interaction.actor}
           other={interaction.other}
+          crew={game.crew}
           onClose={() => {
             setPanel(null);
             setInteraction(null);
@@ -816,7 +860,7 @@ function Game({ server }: { server?: ServerGame }) {
       {panel === "crew" && (
         <CrewEditor
           crew={game.crew}
-          initialCharacterId={activeKey}
+          initialCharacterId={editorCharacter?.id ?? activeKey}
           onPlay={select}
           onChange={(crew) =>
             setGame((g) => ({
@@ -826,10 +870,10 @@ function Game({ server }: { server?: ServerGame }) {
                 (c) => characterKey(c) === g.activeCharacter,
               )
                 ? g.activeCharacter
-                : characterKey(crew[0]),
+                : undefined,
             }))
           }
-          onClose={() => setPanel(null)}
+          onClose={() => setPanel(editorCharacter ? "characters" : null)}
           notify={notify}
         />
       )}

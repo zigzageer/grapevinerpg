@@ -1,10 +1,12 @@
 # Character studio
 
-Open **Characters → Add / edit character** or the corresponding pause-menu action. Empty Discord towns show **Add yourself**. Users can create a character, edit an existing character such as Miel, change appearance details, upload a PNG/JPEG/WebP reference up to 2 MB, and regenerate a preview. Choosing **Add to game** or **Use this version** publishes that version to the shared roster.
+Open **Characters** and select **+** to create a character. The pencil on a character’s card opens their editor directly. Empty Discord towns show **Add character**. Users can change appearance details, upload a PNG/JPEG/WebP reference up to 2 MB, and regenerate a preview. Choosing **Add to game** or **Use this version** publishes that version to the shared roster.
+
+Enter an idea in **Signature ability** to generate a move name, description, and transparent effect sprite. A move and an appearance can be generated together for one attempt. When editing a saved version, select **Keep this version’s appearance** to generate only its move. The preview shows the ability and its PP cost. A published move replaces that character’s existing signature in duels. Generated moves use one of three combat styles with fixed game rules, and their artwork is stored with the version.
 
 Each IP gets **three lifetime generation attempts across all towns**. Accepted attempts include adding, editing, and regenerating. The server reserves the attempt atomically before queueing work. Identical request retries return the existing job. Failed accepted attempts count toward the limit because generation may have consumed usage. IP addresses are normalized and stored as keyed hashes with a persistent database salt. Device storage has no role in enforcing the allowance.
 
-**Show character history** contains every successful generation, including unused previews. The original character is included and its artwork is backed up when the first new generation begins. Choosing an older version restores its appearance and details. Restoring a saved version is free. The current version and prior generations survive service restarts. Interrupted in-progress jobs report failure while preserving existing characters and completed versions.
+**Show character history** contains every successful generation, including unused previews. The original character is included and its artwork is backed up when the first new generation begins. Choosing an older version restores its appearance and signature move. Restoring a saved version is free. The current version and prior generations survive service restarts. Interrupted in-progress jobs report failure while preserving existing characters and completed versions.
 
 ## Runtime
 
@@ -17,6 +19,8 @@ The installed service is `mint-character-studio.service`, with application files
 Vercel production settings include `MINT_STUDIO_ORIGIN` and `MINT_STUDIO_CA`, which contains the public TLS CA certificate. Enable project OIDC with the team issuer. Backend defaults identify the Adventures of Mint project. `MINT_STUDIO_VERCEL_TEAM_SLUG`, `MINT_STUDIO_VERCEL_TEAM_ID`, `MINT_STUDIO_VERCEL_PROJECT_NAME`, and `MINT_STUDIO_VERCEL_PROJECT_ID` support explicitly configured deployments.
 
 Ubuntu settings include `MINT_STUDIO_SECRET`, `MINT_STUDIO_DATA_DIR`, `MINT_STUDIO_SEED_PATH`, `MINT_STUDIO_TLS_KEY`, and `MINT_STUDIO_TLS_CERT`. The service runs Node 22.13+ or 24 and needs `sharp` and `jose`. Generate an initial cast seed with `node scripts/seed-studio.mjs`. Existing data takes precedence over the initial seed.
+
+When deploying a cast update, regenerate the configured seed and restart the studio service with the updated application. Startup adds missing built-in characters and preserves existing versions, jobs, and quotas. The Mint studio supports 40 characters. Discord server towns support 24.
 
 For a consistent filesystem backup, stop the studio service while it is idle, copy `/var/lib/mint-studio`, then restart the service. Keep the SQLite database and `images` directory together. Preserve `/etc/mint-studio` for TLS and internal connection configuration. The quota salt is stored in the database.
 

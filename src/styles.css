@@ -689,6 +689,43 @@ button:active:not(:disabled) {
 .paper-person.walking {
   animation: paper-hop 0.24s steps(2, jump-none) infinite;
 }
+.orrow-speaking-mouth {
+  transform-box: fill-box;
+  transform-origin: center 29%;
+  animation: orrow-talk 1.04s step-end infinite;
+}
+.chair-roll-streaks {
+  opacity: 0.72;
+}
+.chair-caster-spokes {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: chair-wheel-turn 0.27s linear infinite;
+}
+@keyframes orrow-talk {
+  0%,
+  47%,
+  87% {
+    transform: scale(0.86, 0.22);
+  }
+  9%,
+  56% {
+    transform: scale(1.03, 0.92);
+  }
+  22%,
+  66% {
+    transform: scale(0.94, 0.56);
+  }
+  34%,
+  76% {
+    transform: scale(1, 1);
+  }
+}
+@keyframes chair-wheel-turn {
+  to {
+    transform: rotate(1turn);
+  }
+}
 .scene-top {
   position: absolute;
   z-index: 2;

@@ -32,7 +32,7 @@ export interface GenerationJob {
   gameId: string;
   characterId: string;
   status: "queued" | "running" | "succeeded" | "failed";
-  result: { character: Character; versionId: string; image: string } | null;
+  result: { character: Character; versionId: string; image: string | null } | null;
   error: string | null;
   quota: Quota;
 }

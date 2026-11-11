@@ -32,7 +32,9 @@ The user then named the game **Adventures of Mint** and supplied a round pepperm
 
 The illustrated cast members appear in the park and workshop. Local saves upgrade the cast once, preserving custom names and quest progress. The workshop can rename them, replace their art, or switch them to a standard editable cutout. Crew JSON exports preserve their built-in sprite references without embedding image data.
 
-- **David**: Armenian character with a burgundy “grace come baack” shirt (spelling retained as requested), an “i miss grace” arm tattoo, and a blue cap with a white Star of David. AI-generated transparent sprite at `public/characters/david.png`. Existing saves add David once while preserving the rest of the crew and progress.
+- **David** has green eyes, uncovered curly brown hair, and a Cupid’s arrow through his burgundy shirt. His transparent sprite is at `public/characters/david.png`.
+- **Grace** is the blonde character summoned by David’s signature move. She also joins the playable cast with the same artwork at `public/characters/grace.png`.
+- **Tommy** wears the reference red cowboy hat with a blue cross and white stars, stitched cowboy boots, and a straw stem. His transparent sprite is at `public/characters/tommy.png`.
 
 - **Ghost**: Black British woman in a plum hijab and sage-green long-sleeved top, holding a Bible in one hand and an oval loaf of bread in the other. AI-generated transparent sprite at `public/characters/ghost.png`. Existing saves add her once without resetting the crew or quest progress.
 
@@ -51,7 +53,7 @@ These four join existing saves in cast update 6 without replacing customized cas
 - **Kain**: green Pepe-style frog based on the supplied avatar, wearing gold glasses and a pinstripe three-piece suit.
 - **Footjobofsteel**: original muscular golden-yellow bear in a red athletic top and brown shorts. The reference-based image request was rejected; the final original design was generated without that reference.
 
-The current demo replaces the story flow with a character picker and free roaming. All 14 named characters are playable; untouched placeholder friends are omitted, and customized friends are preserved. Character identity and position persist across reloads. Imported and created characters keep unique stable IDs; the workshop supports up to 24 cast members.
+The character picker has 25 named playable characters, including Red Light, Peaches, Lin, Bashu, Orrow, Potato, and kawaiikitty. Cast version 10 adds those seven to older Mint saves and preserves customized friends, the selected character, and position. The Mint workshop supports up to 40 cast members.
 
 The standalone `artifacts/adventures-of-mint.html` embeds the complete game, fonts and art. Validation exercised all characters on desktop, touch controls and camera on phone, workshop editing, save/reload, and standalone gameplay with network disabled after the initial document loaded. Direct `file://` navigation was blocked by this managed Chromium's administrator policy, so the artifact's exact bytes were served as a single document for the network-disabled browser check.
 

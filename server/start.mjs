@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { createImageGenerator } from "../bot/image-generator.mjs";
+import { createAbilityGenerator } from "./ability-generator.mjs";
 import { StudioStore } from "./studio-store.mjs";
 import { StudioService } from "./studio-service.mjs";
 import { createVercelVerifier } from "./vercel-auth.mjs";
@@ -21,6 +22,7 @@ const store = new StudioStore({
 const service = new StudioService({
   store,
   generate: createImageGenerator({ codexEnv: env }),
+  generateAbility: createAbilityGenerator({ codexEnv: env }),
   baseUrl: env.GAME_BASE_URL || "https://adventures-of-mint.vercel.app",
 });
 const server = createStudioServer({

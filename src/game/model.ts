@@ -3,6 +3,12 @@ export { WORLD };
 export type Point = { x: number; y: number };
 export type Hair = "short" | "messy" | "long" | "curly" | "bald";
 export type Hat = "none" | "beanie" | "cap";
+export interface GeneratedAbility {
+  name: string;
+  description: string;
+  style: "burst" | "projectile" | "rush";
+  art: string;
+}
 export interface Character {
   id: string;
   name: string;
@@ -17,6 +23,7 @@ export interface Character {
   glasses: boolean;
   heightScale?: number;
   sprite?: string;
+  ability?: GeneratedAbility;
   preset?:
     | "baguette-guy"
     | "flag-girl"
@@ -32,11 +39,20 @@ export interface Character {
     | "kain"
     | "footjobofsteel"
     | "steakbutterfan"
-    | "blindian";
+    | "blindian"
+    | "grace"
+    | "tommy"
+    | "red-light"
+    | "peaches"
+    | "lin"
+    | "bashu"
+    | "orrow"
+    | "potato"
+    | "kawaiikitty";
 }
 export interface SaveGame {
   version: 1;
-  castVersion: 8;
+  castVersion: 10;
   activeCharacter?: string;
   tvLook?: boolean;
   player: Point;
@@ -47,6 +63,7 @@ export interface SaveGame {
   sound: boolean;
 }
 export const SAVE_KEY = "grapevine.save.v1";
+export const MINT_CREW_LIMIT = 40;
 export const START: Point = { x: 680, y: 560 };
 export const BAGUETTE_GUY: Character = {
   id: "friend-3",
@@ -82,11 +99,11 @@ export const DAVID: Character = {
   kind: "human",
   preset: "david",
   skin: "#f1c49d",
-  hair: "short",
+  hair: "curly",
   hairColor: "#402c24",
   shirt: "#711e37",
   pants: "#35415a",
-  hat: "cap",
+  hat: "none",
   hatColor: "#274694",
   glasses: false,
 };
@@ -264,6 +281,134 @@ export const CAST_ADDITIONS: Character[] = [
     glasses: false,
   },
 ];
+export const GRACE: Character = {
+  id: "cast-grace",
+  name: "Grace",
+  kind: "human",
+  preset: "grace",
+  skin: "#f3c9a9",
+  hair: "long",
+  hairColor: "#e8c25f",
+  shirt: "#a8242e",
+  pants: "#333748",
+  hat: "none",
+  hatColor: "#c04b71",
+  glasses: false,
+};
+export const TOMMY: Character = {
+  id: "cast-tommy",
+  name: "Tommy",
+  kind: "human",
+  preset: "tommy",
+  skin: "#efc3a1",
+  hair: "short",
+  hairColor: "#a06d43",
+  shirt: "#651b2e",
+  pants: "#293249",
+  hat: "cap",
+  hatColor: "#c91c2f",
+  glasses: false,
+};
+export const CAST_VERSION_10_ADDITIONS: Character[] = [
+  {
+    id: "cast-red-light",
+    name: "Red Light",
+    kind: "human",
+    preset: "red-light",
+    skin: "#9d6c48",
+    hair: "messy",
+    hairColor: "#66432d",
+    shirt: "#9d6c48",
+    pants: "#66432d",
+    hat: "none",
+    hatColor: "#8d4b3a",
+    glasses: false,
+  },
+  {
+    id: "cast-peaches",
+    name: "Peaches",
+    kind: "human",
+    preset: "peaches",
+    skin: "#dda680",
+    hair: "short",
+    hairColor: "#503a2a",
+    shirt: "#c3a04b",
+    pants: "#734c31",
+    hat: "none",
+    hatColor: "#8e2e31",
+    glasses: false,
+  },
+  {
+    id: "cast-lin",
+    name: "Lin",
+    kind: "human",
+    preset: "lin",
+    skin: "#e5b699",
+    hair: "long",
+    hairColor: "#302721",
+    shirt: "#c5656b",
+    pants: "#394557",
+    hat: "none",
+    hatColor: "#c5656b",
+    glasses: false,
+  },
+  {
+    id: "cast-bashu",
+    name: "Bashu",
+    kind: "human",
+    preset: "bashu",
+    skin: "#a86547",
+    hair: "long",
+    hairColor: "#25201e",
+    shirt: "#a23351",
+    pants: "#553748",
+    hat: "none",
+    hatColor: "#a23351",
+    glasses: false,
+  },
+  {
+    id: "cast-orrow",
+    name: "Orrow",
+    kind: "human",
+    preset: "orrow",
+    skin: "#edc7aa",
+    hair: "curly",
+    hairColor: "#594239",
+    shirt: "#6b5043",
+    pants: "#494748",
+    hat: "none",
+    hatColor: "#6b5043",
+    glasses: false,
+  },
+  {
+    id: "cast-potato",
+    name: "Potato",
+    kind: "human",
+    preset: "potato",
+    skin: "#a47749",
+    hair: "bald",
+    hairColor: "#805837",
+    shirt: "#a47749",
+    pants: "#805837",
+    hat: "none",
+    hatColor: "#805837",
+    glasses: false,
+  },
+  {
+    id: "cast-kawaiikitty",
+    name: "kawaiikitty",
+    kind: "human",
+    preset: "kawaiikitty",
+    skin: "#785039",
+    hair: "long",
+    hairColor: "#241d24",
+    shirt: "#e38bb1",
+    pants: "#463743",
+    hat: "none",
+    hatColor: "#e38bb1",
+    glasses: false,
+  },
+];
 export const characterKey = (c: Character) => c.id;
 export const characterScale = (c: Character) =>
   c.heightScale ?? (c.preset === "blindian" ? 1.45 : 1);
@@ -312,11 +457,17 @@ export const DEFAULT_CREW: Character[] = [
   ...LATEST_CAST,
   ...DEMO_ADDITIONS,
   ...CAST_ADDITIONS,
+  GRACE,
+  TOMMY,
+  ...CAST_VERSION_10_ADDITIONS,
 ];
+const castPresets = new Set<string>(
+  DEFAULT_CREW.flatMap(({ preset }) => (preset ? [preset] : [])),
+);
+
 export const initialSave = (): SaveGame => ({
   version: 1,
-  castVersion: 8,
-  activeCharacter: "you",
+  castVersion: 10,
   tvLook: true,
   player: { ...START },
   crew: DEFAULT_CREW.map((c) => ({ ...c })),
@@ -325,8 +476,41 @@ export const initialSave = (): SaveGame => ({
   complete: false,
   sound: false,
 });
+export function createCrewMember(index: number): Character {
+  return {
+    ...DEFAULT_CREW[index % 3],
+    kind: "human",
+    sprite: undefined,
+    preset: undefined,
+    id: `custom-${crypto.randomUUID()}`,
+    name: `Friend ${String(index).padStart(2, "0")}`,
+  };
+}
 export const hex = (value: unknown, fallback: string) =>
   typeof value === "string" && /^#[\da-f]{6}$/i.test(value) ? value : fallback;
+
+export function normalizeGeneratedAbility(
+  input: unknown,
+): GeneratedAbility | undefined {
+  if (!input || typeof input !== "object") return;
+  const { name, description, style, art } = input as Record<string, unknown>;
+  if (
+    typeof name !== "string" ||
+    !name.trim() ||
+    name.trim().length > 28 ||
+    typeof description !== "string" ||
+    !description.trim() ||
+    description.trim().length > 120 ||
+    (style !== "burst" && style !== "projectile" && style !== "rush") ||
+    typeof art !== "string" ||
+    !/^\/api\/studio\/assets\/[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}\.png$/.test(
+      art,
+    )
+  )
+    return;
+  return { name: name.trim(), description: description.trim(), style, art };
+}
+
 export function normalizeCharacter(
   raw: unknown,
   fallback = DEFAULT_CREW[0],
@@ -339,22 +523,8 @@ export function normalizeCharacter(
         ? c.id
         : fallback.id,
     preset:
-      c.preset === "baguette-guy" ||
-      c.preset === "flag-girl" ||
-      c.preset === "david" ||
-      c.preset === "ghost" ||
-      c.preset === "rocky" ||
-      c.preset === "miel" ||
-      c.preset === "zippy" ||
-      c.preset === "jat" ||
-      c.preset === "loralei" ||
-      c.preset === "samira" ||
-      c.preset === "genesis" ||
-      c.preset === "kain" ||
-      c.preset === "footjobofsteel" ||
-      c.preset === "steakbutterfan" ||
-      c.preset === "blindian"
-        ? c.preset
+      typeof c.preset === "string" && castPresets.has(c.preset)
+        ? (c.preset as Character["preset"])
         : undefined,
     kind: c.kind === "mint" || c.kind === "human" ? c.kind : fallback.kind,
     name:
@@ -389,6 +559,7 @@ export function normalizeCharacter(
       c.sprite.length < 1_500_000
         ? c.sprite
         : undefined,
+    ability: normalizeGeneratedAbility(c.ability),
   };
 }
 export function parseCrew(input: unknown): Character[] {
@@ -411,7 +582,7 @@ export function parseCrew(input: unknown): Character[] {
       "Choose a crew JSON exported from Grapevine or Paper Town.",
     );
   const ids = new Set<string>();
-  return list.slice(0, 24).map((c, i) => {
+  return list.slice(0, MINT_CREW_LIMIT).map((c, i) => {
     const character = normalizeCharacter(c, {
       ...DEFAULT_CREW[i % 3],
       kind: "human",
@@ -462,23 +633,24 @@ export function loadSave(): SaveGame {
     const raw = JSON.parse(localStorage.getItem(SAVE_KEY) || "null");
     if (raw?.version !== 1) return initialSave();
     const crew = parseCrew(raw.crew);
+    const previousCastVersion = raw.castVersion ?? 0;
     while (crew.length < 3) crew.push({ ...DEFAULT_CREW[crew.length] });
     // Add the newly designed cast member once without replacing customized friends or progress.
     if (
-      (raw.castVersion ?? 0) < 1 &&
+      previousCastVersion < 1 &&
       !crew.some((c) => c.preset === "baguette-guy") &&
-      crew.length < 24
+      crew.length < MINT_CREW_LIMIT
     ) {
       crew.push({ ...BAGUETTE_GUY, id: `friend-${crew.length}` });
     }
     if (
-      (raw.castVersion ?? 0) < 2 &&
+      previousCastVersion < 2 &&
       !crew.some((c) => c.preset === "flag-girl") &&
-      crew.length < 24
+      crew.length < MINT_CREW_LIMIT
     ) {
       crew.push({ ...FLAG_GIRL, id: `friend-${crew.length}` });
     }
-    if ((raw.castVersion ?? 0) < 3) {
+    if (previousCastVersion < 3) {
       for (const character of crew) {
         if (
           character.preset === "baguette-guy" &&
@@ -490,42 +662,47 @@ export function loadSave(): SaveGame {
       }
     }
     if (
-      (raw.castVersion ?? 0) < 4 &&
+      previousCastVersion < 4 &&
       !crew.some((c) => c.preset === "david") &&
-      crew.length < 24
+      crew.length < MINT_CREW_LIMIT
     ) {
       crew.push({ ...DAVID, id: `friend-${crew.length}` });
     }
     if (
-      (raw.castVersion ?? 0) < 5 &&
+      previousCastVersion < 5 &&
       !crew.some((c) => c.preset === "ghost") &&
-      crew.length < 24
+      crew.length < MINT_CREW_LIMIT
     ) {
       crew.push({ ...GHOST, id: `friend-${crew.length}` });
     }
-    if ((raw.castVersion ?? 0) < 6) {
+    if (previousCastVersion < 6) {
       for (const character of LATEST_CAST) {
         if (
-          crew.length < 24 &&
+          crew.length < MINT_CREW_LIMIT &&
           !crew.some((c) => c.preset === character.preset)
         ) {
           crew.push({ ...character, id: `friend-${crew.length}` });
         }
       }
     }
-    if ((raw.castVersion ?? 0) < 7) {
+    if (previousCastVersion < 7) {
       for (const character of DEMO_ADDITIONS) {
         if (
-          crew.length < 24 &&
+          crew.length < MINT_CREW_LIMIT &&
           !crew.some((c) => c.preset === character.preset)
         )
           crew.push({ ...character, id: `friend-${crew.length}` });
       }
     }
-    if ((raw.castVersion ?? 0) < 8) {
-      for (const character of CAST_ADDITIONS) {
+    if (previousCastVersion < 10) {
+      const additions = [
+        ...(previousCastVersion < 8 ? CAST_ADDITIONS : []),
+        ...(previousCastVersion < 9 ? [GRACE, TOMMY] : []),
+        ...CAST_VERSION_10_ADDITIONS,
+      ];
+      for (const character of additions) {
         if (
-          crew.length >= 24 ||
+          crew.length >= MINT_CREW_LIMIT ||
           crew.some((c) => c.preset === character.preset)
         )
           continue;
@@ -545,23 +722,15 @@ export function loadSave(): SaveGame {
         : { ...START };
     return {
       version: 1,
-      castVersion: 8,
+      castVersion: 10,
       tvLook: raw.tvLook !== false,
       activeCharacter:
-        typeof raw.activeCharacter === "string" &&
-        crew.some(
-          (c) =>
-            characterKey(c) === raw.activeCharacter ||
-            c.preset === raw.activeCharacter,
-        )
-          ? characterKey(
-              crew.find(
-                (c) =>
-                  characterKey(c) === raw.activeCharacter ||
-                  c.preset === raw.activeCharacter,
-              )!,
-            )
-          : "you",
+        typeof raw.activeCharacter === "string"
+          ? (
+              crew.find((c) => c.id === raw.activeCharacter) ??
+              crew.find((c) => c.preset === raw.activeCharacter)
+            )?.id
+          : undefined,
       player,
       crew,
       greeted: raw.greeted === true,

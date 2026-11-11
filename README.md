@@ -2,13 +2,13 @@
 
 **Play:** https://adventures-of-mint.vercel.app
 
-A full-screen 2D browser game starring Mint and the whole cast. Open the game and start walking. The world fills the display; character selection, controls, and editing live in in-game overlays. This free-roam demo has no story or quests yet.
+A full-screen 2D browser game starring Mint and the whole cast. Choose a character on your first visit, then start walking. The game remembers your choice on this device. The world fills the display; character selection, controls, and editing live in in-game overlays. This free-roam demo has no story or quests yet.
 
-Click a character in town to **Fight**, **Kiss**, or **Play as** them. Friendly one-on-one duels use timed hits and blocks, melee and ranged attacks, power points, armor, burning, stun, and two snacks per fight. Health and power refill each duel. Tap the timing button or press Space when the marker reaches the green zone, with perfect timing in its gold center. The combat is inspired by the mechanics described in [Prima’s Stick of Truth combat guide](https://primagames.com/eguides/south-park-the-stick-of-truth-eguide/how-not-to-get-screwed/how-not-to-get-screwed).
+Click a cast member in town to **Fight**, **Kiss**, or **Play as** them. Duels take over the screen with a side-on street arena, HP and PP bars, and circular move buttons around the active fighter on wide screens. Each built-in character has a signature move. David calls Grace for a kiss and a randomly sized combo, and blindian calls Jat and Genesis for a two-hit tag team. Tap **Strike!** or **Block!**, or press Space, when the timing marker reaches green. Gold gives perfect timing. Armor, burning, stun, bracing, and two snacks per fight are available, and HP and PP refill each duel. The combat is inspired by [The Stick of Truth](https://primagames.com/eguides/south-park-the-stick-of-truth-eguide/how-not-to-get-screwed/how-not-to-get-screwed). See [combat art and prompts](docs/combat-art.md).
 
 Each Discord server can have its own empty town and cast. The `/game create` and `/game add` bot modules use the VPS Codex CLI and its saved ChatGPT login to generate characters from server nicknames, avatars, descriptions, and uploaded references. The bot publishes its roster and artwork through GitHub and Vercel. See [bot integration and setup](docs/discord-games.md).
 
-Open **Characters → Add / edit character** to add yourself or regenerate an existing character from new details and an optional reference image. Each IP has three lifetime generation attempts across all towns. Preview a generation, choose the version to use, and restore older artwork through **Show character history**. See [character studio setup and storage](docs/character-studio.md).
+Open **Characters** and select **+** to add someone, or use the pencil on a character’s card to open their editor. Enter a **Signature ability** idea to generate a move and effect artwork. Select **Keep this version’s appearance** to generate just the move. Each IP has three lifetime generation attempts across all towns. Preview a generation, choose the version to use, and restore older artwork and abilities through **Show character history**. See [character studio setup and storage](docs/character-studio.md).
 
 The engine is custom **React + TypeScript + SVG**, with a frame-based movement loop, collision checks, A\* pathfinding, and a character-follow camera. It does not use Phaser, Unity, or a third-party game engine.
 
@@ -39,7 +39,7 @@ The **TV episode look** is on by default: color grading, paper grain, fine broad
 
 ## Cast & workshop
 
-All 16 named characters are playable: **Mint, Baguette, Sarina, David, Ghost, Rocky, Miel, Zippy, Jat, Loralei, Samira, Genesis, Kain, Footjobofsteel, steakbutterfan, and blindian**. Genesis’s puppy and leash move with his sprite. steakbutterfan carries his oversized burger. blindian is especially tall, with vertically split hip-hop and traditional Indian clothing. Customized friends are retained from older saves; the workshop supports up to 24 characters.
+The main game has 25 playable cast members. Grace, Tommy, Red Light, Peaches, Lin, Bashu, Orrow, Potato, and kawaiikitty join the original cast. Orrow chatters while standing and moving, and kawaiikitty rolls around in her gaming chair. The Mint workshop supports up to 40 characters and retains customized friends from older saves. Discord towns support up to 24.
 
 Open **Pause → Character workshop** or the workshop button in the picker to edit names, upload transparent PNG/WebP sprites (under 1 MB), or export/import the crew. Restore a standard cutout to edit individual appearance traits. Generated character sprites have a fixed appearance.
 

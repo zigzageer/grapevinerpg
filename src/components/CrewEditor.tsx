@@ -9,7 +9,12 @@ import {
   Check,
 } from "lucide-react";
 import type { Character, Hair, Hat } from "../game/model";
-import { DEFAULT_CREW, parseCrew, characterKey } from "../game/model";
+import {
+  createCrewMember,
+  parseCrew,
+  characterKey,
+  MINT_CREW_LIMIT,
+} from "../game/model";
 import { ADDITIONAL_BIOS } from "../game/character-bios";
 import { Portrait } from "./Character";
 import { Modal } from "./Modal";
@@ -79,11 +84,12 @@ export function CrewEditor({
       if (file.size > 8_000_000)
         throw new Error("Choose a JSON file smaller than 8 MB.");
       const imported = parseCrew(JSON.parse(await file.text()));
-      const friends =
-        imported[0]?.kind === "mint" ? imported.slice(1) : imported;
+      const friends = (
+        imported[0]?.kind === "mint" ? imported.slice(1) : imported
+      ).slice(0, MINT_CREW_LIMIT - 1);
       onChange([
         crew[0],
-        ...friends.slice(0, 23).map((m, i) => ({
+        ...friends.map((m, i) => ({
           ...m,
           id: `friend-${i + 1}`,
           kind: "human" as const,
@@ -158,19 +164,9 @@ export function CrewEditor({
           </button>
         ))}
         <button
-          disabled={crew.length >= 24}
+          disabled={crew.length >= MINT_CREW_LIMIT}
           onClick={() => {
-            onChange([
-              ...crew,
-              {
-                ...DEFAULT_CREW[crew.length % 3],
-                kind: "human",
-                sprite: undefined,
-                preset: undefined,
-                id: `custom-${crypto.randomUUID()}`,
-                name: `Friend ${String(crew.length).padStart(2, "0")}`,
-              },
-            ]);
+            onChange([...crew, createCrewMember(crew.length)]);
             setSelected(crew.length);
           }}
         >
@@ -246,17 +242,6 @@ export function CrewEditor({
                 Ghost is a Black British woman in a plum hijab and sage-green
                 top. She carries a Bible in one hand and a fresh loaf of bread
                 in the other.
-              </p>
-              <span className="small-badge">Original character sprite</span>
-            </div>
-          ) : c.preset === "david" && !c.sprite ? (
-            <div className="mint-note">
-              <span className="eyebrow">MEET DAVID</span>
-              <h3>Grace, if you’re reading this…</h3>
-              <p>
-                David is Armenian. His burgundy shirt says “grace come baack,”
-                his arm tattoo says “i miss grace,” and his blue cap carries a
-                white Star of David.
               </p>
               <span className="small-badge">Original character sprite</span>
             </div>

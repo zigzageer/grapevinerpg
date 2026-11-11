@@ -21,6 +21,59 @@ export function CharacterArt(props: ArtProps) {
   );
 }
 
+function OrrowMouth() {
+  return (
+    <g transform="translate(74.7 69.7)">
+      <path
+        d="M-4.3 0H4.3"
+        stroke="#f8b68e"
+        strokeWidth="1.1"
+        strokeLinecap="round"
+      />
+      <g className="orrow-speaking-mouth">
+        <path
+          d="M-6.8-1.3Q-2.5-2 1.3-1.6L6.8-.7Q4.4 4.7.3 4.8Q-4.6 4.8-6.8-1.3Z"
+          fill="#442a26"
+        />
+        <path
+          d="M-5.7-1.05L-3-1.38l.68 1.94-2.1.49ZM-2.65-1.44l2.62.04.84 2.26-2.66-.2ZM.44-1.38l2.7.18-.57 2.44L1.2.84ZM3.6-1.16l2.17.31-1.31 1.88-1.43.39ZM-.5 3.88l1.8-1.24 1.18.86Q.8 4.28-.5 3.88Z"
+          fill="#fff1d3"
+        />
+      </g>
+    </g>
+  );
+}
+
+function ChairRoll({ facing }: { facing: number }) {
+  return (
+    <>
+      <g
+        className="chair-roll-streaks"
+        transform={`translate(${75 - 47 * facing} 161) scale(${facing} 1)`}
+      >
+        <path
+          d="M-19 0H-5M-26 7h15M-15 13h10"
+          fill="none"
+          stroke="#f2d7e2"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+        />
+      </g>
+      {[34.5, 64.5, 95.75].map((x) => (
+        <g key={x} transform={`translate(${x} 174.3)`}>
+          <path
+            className="chair-caster-spokes"
+            d="M-2.8 0h5.6M0-2.8v5.6"
+            stroke="#665662"
+            strokeWidth="0.75"
+            strokeLinecap="round"
+          />
+        </g>
+      ))}
+    </>
+  );
+}
+
 function CharacterCutout({
   c,
   moving = false,
@@ -42,9 +95,11 @@ function CharacterCutout({
       </g>
     );
   const sprite = c.sprite || (c.preset ? characterArtUrl(c.preset) : undefined);
-  if (sprite)
+  if (sprite) {
+    const rolling = moving && !c.sprite && c.preset === "kawaiikitty";
+    const motion = rolling ? " chair-rolling" : moving ? " walking" : "";
     return (
-      <g className={moving ? "paper-person walking" : "paper-person"}>
+      <g className={`paper-person${motion}`}>
         <image
           href={sprite}
           x="0"
@@ -53,8 +108,11 @@ function CharacterCutout({
           height={c.preset === "zippy" ? 150 : 180}
           preserveAspectRatio="xMidYMax meet"
         />
+        {!c.sprite && c.preset === "orrow" && <OrrowMouth />}
+        {rolling && <ChairRoll facing={facing} />}
       </g>
     );
+  }
   const turn = facing * 2;
   return (
     <g className={moving ? "paper-person walking" : "paper-person"}>

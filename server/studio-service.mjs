@@ -1,5 +1,5 @@
 import sharp from "sharp";
-import { StudioError } from "./studio-store.mjs";
+import { assetUrl, StudioError } from "./studio-store.mjs";
 import { validateReference } from "../bot/image-generator.mjs";
 
 export const validGameId = (id) => id === "mint" || /^\d{17,20}$/.test(id);
@@ -10,9 +10,16 @@ const validRequest = (id) =>
   /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(id);
 
 export class StudioService {
-  constructor({ store, generate, baseUrl, fetch: request = globalThis.fetch }) {
+  constructor({
+    store,
+    generate,
+    generateAbility,
+    baseUrl,
+    fetch: request = globalThis.fetch,
+  }) {
     this.store = store;
     this.generate = generate;
+    this.generateAbility = generateAbility;
     this.baseUrl = baseUrl;
     this.fetch = request;
     this.running = false;
@@ -61,20 +68,43 @@ export class StudioService {
   }
 
   async enqueue(input, ip) {
-    const { gameId, characterId, requestId } = input;
+    const { gameId, characterId, requestId, abilityOnly = false } = input;
     this.game(gameId);
     if (!validRequest(requestId))
       throw new StudioError("Start a new generation request.");
     if (characterId !== undefined && !validId(characterId))
       throw new StudioError("Invalid character ID.");
-    const name = typeof input.name === "string" ? input.name.trim() : "";
-    if (!name || name.length > 28)
-      throw new StudioError("Choose a character name with 1–28 characters.");
     if (
-      typeof input.description !== "string" ||
-      input.description.length > 1000
+      typeof abilityOnly !== "boolean" ||
+      (input.abilityPrompt !== undefined &&
+        (typeof input.abilityPrompt !== "string" ||
+          input.abilityPrompt.trim().length > 500))
     )
-      throw new StudioError("Keep appearance details under 1,000 characters.");
+      throw new StudioError(
+        "Use up to 500 characters for a signature ability.",
+      );
+    const abilityPrompt = input.abilityPrompt?.trim();
+    if (abilityOnly && (!characterId || !abilityPrompt))
+      throw new StudioError(
+        "Choose a character and describe their signature ability.",
+      );
+    if (abilityPrompt && !this.generateAbility)
+      throw new StudioError(
+        "Signature ability generation is temporarily unavailable.",
+        503,
+      );
+    const name = typeof input.name === "string" ? input.name.trim() : "";
+    if (!abilityOnly) {
+      if (!name || name.length > 28)
+        throw new StudioError("Choose a character name with 1–28 characters.");
+      if (
+        typeof input.description !== "string" ||
+        input.description.length > 1000
+      )
+        throw new StudioError(
+          "Keep appearance details under 1,000 characters.",
+        );
+    }
     let character;
     if (characterId) {
       const row = this.store.character(gameId, characterId);
@@ -91,6 +121,7 @@ export class StudioService {
         kind: "human",
         preset: undefined,
         sprite: undefined,
+        ability: undefined,
       };
     }
     if (
@@ -98,17 +129,20 @@ export class StudioService {
       (!characterId || !validRequest(input.referenceVersionId))
     )
       throw new StudioError("Invalid reference version.");
-    if (input.referenceVersionId)
-      this.store.version(gameId, characterId, input.referenceVersionId);
     const payload = {
-      name,
-      description: input.description.trim(),
-      useCurrent: Boolean(input.useCurrent),
+      ...(abilityOnly
+        ? { abilityOnly: true }
+        : {
+            name,
+            description: input.description.trim(),
+            useCurrent: Boolean(input.useCurrent),
+          }),
+      ...(abilityPrompt ? { abilityPrompt } : {}),
       ...(input.referenceVersionId
         ? { referenceVersionId: input.referenceVersionId }
         : {}),
     };
-    if (input.image !== undefined) {
+    if (!abilityOnly && input.image !== undefined) {
       const image = input.image;
       if (
         !image ||
@@ -141,18 +175,17 @@ export class StudioService {
     return result;
   }
 
-  async currentReference(job, payload) {
-    const row = this.store.character(job.game_id, job.character_id);
-    const versionId = payload.referenceVersionId || row.current_version;
-    if (!versionId) return null;
-    const version = this.store.version(
-      job.game_id,
-      job.character_id,
-      versionId,
+  async currentReference(version, preserveCharacter) {
+    if (!version?.image) return null;
+    const stored = /^\/api\/studio\/assets\/([a-f0-9-]{36})\.png$/.exec(
+      version.image,
     );
-    if (!version.image) return null;
-    if (version.image.startsWith("/api/studio/assets/"))
-      return { bytes: this.store.image(version.id), type: "image/png" };
+    if (stored)
+      return {
+        bytes: this.store.image(stored[1]),
+        type: "image/png",
+        image: version.image,
+      };
     if (
       !/^\/characters\/[a-z0-9-]+\.png$/.test(version.image) &&
       !/^\/games\/\d{17,20}\/\d{17,20}\.png$/.test(version.image)
@@ -176,8 +209,8 @@ export class StudioService {
     const png = await sharp(bytes, { limitInputPixels: 25_000_000 })
       .png()
       .toBuffer();
-    this.store.backupOriginal(version, png);
-    return { bytes: png, type: "image/png" };
+    this.store.backupOriginal(version, png, preserveCharacter);
+    return { bytes: png, type: "image/png", image: assetUrl(version.id) };
   }
 
   async drain() {
@@ -189,24 +222,64 @@ export class StudioService {
         job && !this.closing;
         job = this.store.nextJob()
       ) {
-        this.store.startJob(job.id);
+        if (!this.store.startJob(job.id)) continue;
         try {
           const payload = JSON.parse(job.payload);
+          const row = this.store.character(job.game_id, job.character_id);
+          const versionId = payload.baseCharacter
+            ? payload.baseVersionId
+            : payload.referenceVersionId || row.current_version;
+          const version = versionId
+            ? this.store.version(job.game_id, job.character_id, versionId)
+            : null;
+          const character = {
+            ...(payload.baseCharacter || JSON.parse(row.data)),
+          };
           const references = [];
           // Preserve an original snapshot even when it is excluded from the prompt.
-          const original = await this.currentReference(job, payload);
-          if (payload.useCurrent && original) references.push(original);
+          const original = await this.currentReference(
+            version,
+            payload.abilityOnly,
+          );
+          if (payload.useCurrent && original)
+            references.push({ bytes: original.bytes, type: original.type });
           if (payload.image)
             references.push({
               bytes: Buffer.from(payload.image.base64, "base64"),
               type: payload.image.type,
             });
-          const bytes = await this.generate({
-            name: payload.name,
-            description: payload.description,
-            references,
+          let bytes;
+          let description = version?.description || "";
+          if (!payload.abilityOnly) {
+            character.name = payload.name;
+            description = payload.description;
+            bytes = await this.generate({
+              name: character.name,
+              description,
+              references,
+            });
+          }
+          let ability;
+          if (payload.abilityPrompt) {
+            try {
+              ability = await this.generateAbility({
+                name: character.name,
+                prompt: payload.abilityPrompt,
+              });
+            } catch {
+              throw new StudioError(
+                "The signature ability could not be generated. Your saved versions are still available.",
+                502,
+              );
+            }
+          }
+          this.store.finishGeneration(job, {
+            character,
+            bytes,
+            description,
+            image: original?.image,
+            ability,
           });
-          this.store.finishGeneration(job, bytes, payload.description);
         } catch (error) {
           const message =
             error instanceof StudioError

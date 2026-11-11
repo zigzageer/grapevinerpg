@@ -10,3 +10,9 @@ export function sceneryArtUrl(name: string): string {
     .__MINT_SCENERY__;
   return embedded?.[name] || `/scenery/${name}.png`;
 }
+
+export function abilityArtUrl(name: string): string {
+  const embedded = (globalThis as { __MINT_ABILITIES__?: Record<string, string> })
+    .__MINT_ABILITIES__;
+  return embedded?.[name] || `/abilities/${name}.webp`;
+}

@@ -1,10 +1,13 @@
 import { DatabaseSync } from "node:sqlite";
 import {
-  mkdirSync,
-  readFileSync,
-  writeFileSync,
+  closeSync,
   existsSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  rmSync,
   statfsSync,
+  writeFileSync,
 } from "node:fs";
 import path from "node:path";
 import { randomUUID, createHash, createHmac, randomBytes } from "node:crypto";
@@ -16,6 +19,10 @@ export class StudioError extends Error {
   }
 }
 export const assetUrl = (id) => `/api/studio/assets/${id}.png`;
+const MINT_CREW_LIMIT = 40;
+const SERVER_CREW_LIMIT = 24;
+const crewLimit = (gameId) =>
+  gameId === "mint" ? MINT_CREW_LIMIT : SERVER_CREW_LIMIT;
 const now = () => new Date().toISOString();
 const uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
 
@@ -63,7 +70,10 @@ export class StudioStore {
         (game) => {
           const additions = seed.characters
             .filter((character) => !this.character("mint", character.id))
-            .slice(0, Math.max(0, 24 - (game?.characters.length || 0)));
+            .slice(
+              0,
+              Math.max(0, MINT_CREW_LIMIT - (game?.characters.length || 0)),
+            );
           if (game && !additions.length) return game;
           return {
             ...(game || {
@@ -136,7 +146,7 @@ export class StudioStore {
       !game.slug.endsWith(`-${gameId}`) ||
       !Number.isFinite(Date.parse(game.updatedAt)) ||
       !Array.isArray(game.characters) ||
-      game.characters.length > 24 ||
+      game.characters.length > SERVER_CREW_LIMIT ||
       new Set(game.characters.map((character) => character?.id)).size !==
         game.characters.length ||
       game.characters.some(
@@ -166,8 +176,11 @@ export class StudioStore {
       if (!this.character(gameId, character.id)?.managed)
         characters.set(character.id, character);
     }
-    if (characters.size > 24)
-      throw new StudioError("This town already has 24 characters.", 409);
+    if (characters.size > SERVER_CREW_LIMIT)
+      throw new StudioError(
+        `This town already has ${SERVER_CREW_LIMIT} characters.`,
+        409,
+      );
     const result = this.update(gameId, () => ({
       ...game,
       slug: current?.slug || game.slug,
@@ -197,34 +210,31 @@ export class StudioStore {
   addVersion(
     gameId,
     character,
-    { bytes, description = "", source = "website", id = randomUUID() } = {},
+    {
+      image = character.sprite ||
+        (character.kind === "mint"
+          ? "/characters/mint.png"
+          : character.preset
+            ? `/characters/${character.preset}.png`
+            : null),
+      description = "",
+      source = "website",
+      id = randomUUID(),
+    } = {},
   ) {
-    let snapshot = { ...character };
-    let image =
-      snapshot.sprite ||
-      (snapshot.kind === "mint"
-        ? "/characters/mint.png"
-        : snapshot.preset
-          ? `/characters/${snapshot.preset}.png`
-          : null);
-    if (bytes) {
-      this.saveImage(id, bytes);
-      image = assetUrl(id);
-      snapshot = { ...snapshot, sprite: image, preset: undefined };
-    }
     this.db
       .prepare("INSERT INTO versions VALUES(?,?,?,?,?,?,?,?)")
       .run(
         id,
         gameId,
-        snapshot.id,
-        JSON.stringify(snapshot),
+        character.id,
+        JSON.stringify(character),
         description,
         image,
         source,
         now(),
       );
-    return { id, character: snapshot, image, description, source };
+    return { id, character, image, description, source };
   }
 
   update(gameId, change, { descriptions = {} } = {}) {
@@ -301,6 +311,7 @@ export class StudioStore {
         if (
           previous.ip_hash !== ipHash ||
           previous.game_id !== gameId ||
+          previous.character_id !== character.id ||
           previous.source !== source ||
           previous.request_hash !== requestHash
         )
@@ -310,6 +321,22 @@ export class StudioStore {
           );
         return this.job(id, ipHash);
       }
+      const row = this.character(gameId, character.id);
+      const baseVersionId = payload.referenceVersionId || row?.current_version;
+      const baseVersion = baseVersionId
+        ? this.version(gameId, character.id, baseVersionId)
+        : null;
+      if (payload.abilityOnly && !baseVersion)
+        throw new StudioError(
+          "Choose a saved character version for this ability.",
+        );
+      const baseCharacter = row
+        ? JSON.parse(
+            baseVersion && baseVersion.id !== row.current_version
+              ? baseVersion.character
+              : row.data,
+          )
+        : character;
       if (
         this.db
           .prepare(
@@ -332,14 +359,18 @@ export class StudioStore {
           "Character storage is temporarily full. Please try later.",
           503,
         );
-      if (!this.character(gameId, character.id)) {
+      if (!row) {
+        const limit = crewLimit(gameId);
         const count = this.db
           .prepare(
             "SELECT COUNT(*) AS count FROM characters c WHERE game_id=? AND (visible=1 OR EXISTS(SELECT 1 FROM jobs j WHERE j.game_id=c.game_id AND j.character_id=c.id AND j.status IN ('queued','running')))",
           )
           .get(gameId).count;
-        if (count >= 24)
-          throw new StudioError("This town already has 24 characters.", 409);
+        if (count >= limit)
+          throw new StudioError(
+            `This town already has ${limit} characters.`,
+            409,
+          );
         this.db
           .prepare(
             "INSERT INTO characters(game_id,id,data,visible,created_at) VALUES(?,?,?,0,?)",
@@ -362,7 +393,7 @@ export class StudioStore {
           character.id,
           ipHash,
           source,
-          JSON.stringify(payload),
+          JSON.stringify({ ...payload, baseVersionId, baseCharacter }),
           requestHash,
           now(),
         );
@@ -394,31 +425,54 @@ export class StudioStore {
   }
 
   startJob(id) {
-    this.db
+    const result = this.db
       .prepare(
         "UPDATE jobs SET status='running' WHERE id=? AND status='queued'",
       )
       .run(id);
+    return result.changes === 1;
   }
 
-  finishGeneration(job, bytes, description) {
-    return this.transaction(() => {
-      const payload = JSON.parse(job.payload);
-      const row = this.character(job.game_id, job.character_id);
-      const character = { ...JSON.parse(row.data), name: payload.name };
-      const version = this.addVersion(job.game_id, character, {
-        bytes,
-        description,
-        id: job.id,
+  finishGeneration(job, { character, bytes, description, image, ability }) {
+    const files = [];
+    try {
+      return this.transaction(() => {
+        let snapshot = character;
+        if (bytes) {
+          files.push(this.saveImage(job.id, bytes));
+          image = assetUrl(job.id);
+          snapshot = { ...snapshot, sprite: image, preset: undefined };
+        }
+        if (ability) {
+          const id = randomUUID();
+          files.push(this.saveImage(id, ability.bytes));
+          snapshot = {
+            ...snapshot,
+            ability: {
+              name: ability.name,
+              description: ability.description,
+              style: ability.style,
+              art: assetUrl(id),
+            },
+          };
+        }
+        const version = this.addVersion(job.game_id, snapshot, {
+          description,
+          image,
+          id: job.id,
+        });
+        const result = {
+          character: version.character,
+          versionId: version.id,
+          image: version.image,
+        };
+        this.finishJob(job.id, result);
+        return result;
       });
-      const result = {
-        character: version.character,
-        versionId: version.id,
-        image: version.image,
-      };
-      this.finishJob(job.id, result);
-      return result;
-    });
+    } catch (error) {
+      for (const file of files) rmSync(file, { force: true });
+      throw error;
+    }
   }
 
   finishJob(id, result) {
@@ -504,12 +558,13 @@ export class StudioStore {
   apply(gameId, characterId, versionId) {
     return this.transaction(() => {
       const version = this.version(gameId, characterId, versionId);
+      const limit = crewLimit(gameId);
       if (
         !this.character(gameId, characterId).visible &&
-        this.read(gameId).characters.length >= 24
+        this.read(gameId).characters.length >= limit
       )
         throw new StudioError(
-          "This town already has 24 characters. Your generation is saved in history.",
+          `This town already has ${limit} characters. Your generation is saved in history.`,
           409,
         );
       this.db
@@ -525,7 +580,18 @@ export class StudioStore {
   saveImage(id, bytes) {
     if (!uuid.test(id)) throw new StudioError("Invalid image ID.");
     const file = path.join(this.directory, "images", `${id}.png`);
-    writeFileSync(file, bytes, { flag: "wx", mode: 0o600 });
+    const handle = openSync(file, "wx", 0o600);
+    try {
+      try {
+        writeFileSync(handle, bytes);
+      } finally {
+        closeSync(handle);
+      }
+    } catch (error) {
+      rmSync(file, { force: true });
+      throw error;
+    }
+    return file;
   }
 
   image(id) {
@@ -535,18 +601,21 @@ export class StudioStore {
     return readFileSync(file);
   }
 
-  backupOriginal(version, bytes) {
+  backupOriginal(version, bytes, preserveCharacter = false) {
     if (version.image?.startsWith("/api/studio/assets/")) return;
     const image = assetUrl(version.id);
     this.saveImage(version.id, bytes);
-    const snapshot = {
-      ...JSON.parse(version.character),
-      sprite: image,
-      preset: undefined,
-    };
+    // An ability-only edit keeps the character's built-in rendering layout.
+    const snapshot = preserveCharacter
+      ? version.character
+      : JSON.stringify({
+          ...JSON.parse(version.character),
+          sprite: image,
+          preset: undefined,
+        });
     this.db
       .prepare("UPDATE versions SET image=?,character=? WHERE id=?")
-      .run(image, JSON.stringify(snapshot), version.id);
+      .run(image, snapshot, version.id);
   }
 
   close() {

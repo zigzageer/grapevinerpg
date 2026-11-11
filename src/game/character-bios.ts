@@ -6,6 +6,54 @@ export const ADDITIONAL_BIOS: Partial<
     { title: string; description: string }
   >
 > = {
+  "red-light": {
+    title: "Always watching.",
+    description: "Red Light is a fuzzy brown creature with enormous eyes.",
+  },
+  peaches: {
+    title: "Never charges alone.",
+    description:
+      "Peaches wears gold armor and a red cloak and travels with a lion.",
+  },
+  lin: {
+    title: "Lin and andre.",
+    description:
+      "Lin wears a shirt printed with names and carries an Eastern European folk doll labeled ‘andre’.",
+  },
+  bashu: {
+    title: "Watch the ring.",
+    description:
+      "Bashu has long hair, a bindi, and makeup. Her Indian top reads ‘lookism mod’ and she wears an engagement ring.",
+  },
+  orrow: {
+    title: "Still talking.",
+    description:
+      "Orrow wears an 18th-century British outfit and chatters through crooked teeth.",
+  },
+  potato: {
+    title: "Sprouted legs.",
+    description: "A brown potato with legs.",
+  },
+  kawaiikitty: {
+    title: "Rolling into town.",
+    description:
+      "kawaiikitty is a Black girl in pink Jirai Kei fashion who rolls around in a pink gaming chair.",
+  },
+  grace: {
+    title: "Right on cue.",
+    description:
+      "Grace has long blonde hair and makes a cameo in David’s signature move.",
+  },
+  david: {
+    title: "Grace, if you’re reading this…",
+    description:
+      "David is Armenian, with green eyes and uncovered curly brown hair. He wears a burgundy shirt with a Cupid’s arrow through the middle.",
+  },
+  tommy: {
+    title: "Boots on the ground.",
+    description:
+      "Tommy wears a red cowboy hat and stitched cowboy boots, with a straw stem between his teeth.",
+  },
   steakbutterfan: {
     title: "The burger comes along.",
     description:

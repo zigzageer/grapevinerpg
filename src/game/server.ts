@@ -91,7 +91,7 @@ export function loadServerSave(server: ServerGame): SaveGame {
       (c) => c.id === saved.activeCharacter,
     )
       ? saved.activeCharacter
-      : server.characters[0]?.id,
+      : undefined,
     tvLook: saved.tvLook !== false,
   };
 }

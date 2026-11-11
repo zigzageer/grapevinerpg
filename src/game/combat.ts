@@ -1,18 +1,31 @@
+import { getSignatureMove } from "./abilities";
+import type { Character } from "./model";
+
 export type Side = "player" | "opponent";
 export type TimingGrade = "perfect" | "good" | "miss";
-export type MoveId = "quick" | "heavy" | "snowball" | "spark" | "stomp";
+export type BasicMoveId = "quick" | "heavy" | "snowball" | "spark" | "stomp";
+export type MoveId = BasicMoveId | "signature";
+export type AbilityVisual =
+  | "grace"
+  | "tag-team"
+  | "burst"
+  | "projectile"
+  | "rush";
 
-interface Move {
+export interface Move {
   name: string;
   description: string;
   cost: number;
   damage: number;
-  hits: number;
+  hits: number | readonly [min: number, max: number];
   armor: number;
   effect?: "burn" | "stun";
+  visual?: AbilityVisual;
+  art?: string;
+  tag?: string;
 }
 
-export const MOVES: Record<MoveId, Move> = {
+export const MOVES: Record<BasicMoveId, Move> = {
   quick: {
     name: "Quick hits",
     description: "Three light hits. Armor reduces each hit.",
@@ -66,6 +79,11 @@ export interface Fighter {
   armor: number;
   burning: number;
   stunned: boolean;
+  signature?: Move;
+}
+
+export function getMove(fighter: Fighter, id: MoveId): Move | undefined {
+  return id === "signature" ? fighter.signature : MOVES[id];
 }
 
 export interface BattleEvent {
@@ -74,6 +92,10 @@ export interface BattleEvent {
   grade: TimingGrade;
   damage: number;
   text: string;
+  hits?: number;
+  visual?: AbilityVisual;
+  art?: string;
+  tag?: string;
 }
 
 export interface BattleState {
@@ -91,7 +113,7 @@ export interface BattleState {
 
 export type BattleAction =
   | { type: "choose"; move: MoveId }
-  | { type: "timing"; grade: TimingGrade }
+  | { type: "timing"; grade: TimingGrade; roll?: number }
   | { type: "brace" }
   | { type: "snack" }
   | { type: "advance" };
@@ -108,9 +130,12 @@ export function timingGrade(progress: number): TimingGrade {
   return "miss";
 }
 
-export function createBattle(player: string, opponent: string): BattleState {
-  const fighter = (name: string, hp: number): Fighter => ({
-    name,
+export function createBattle(
+  player: Character | string,
+  opponent: Character | string,
+): BattleState {
+  const fighter = (character: Character | string, hp: number): Fighter => ({
+    name: typeof character === "string" ? character : character.name,
     hp,
     maxHp: hp,
     pp: 6,
@@ -118,6 +143,8 @@ export function createBattle(player: string, opponent: string): BattleState {
     armor: 3,
     burning: 0,
     stunned: false,
+    signature:
+      typeof character === "string" ? undefined : getSignatureMove(character),
   });
   return {
     player: fighter(player, 100),
@@ -166,6 +193,7 @@ function beginTurn(state: BattleState, side: Side): BattleState {
       text: `${fighter.name} is stunned and misses a turn.${damage ? ` Burning deals ${damage} damage.` : ""}`,
     };
     next.eventId++;
+    if (side === "player") next.round++;
     return beginTurn(next, side === "player" ? "opponent" : "player");
   }
   next[side].pp = Math.min(fighter.maxPp, fighter.pp + 1);
@@ -177,18 +205,36 @@ function beginTurn(state: BattleState, side: Side): BattleState {
       itemUsed: false,
       round: state.round + 1,
     };
-  const pattern: MoveId[] = ["quick", "heavy", "spark"];
+  const pattern = ["quick", "heavy", "spark"] as const;
   const planned = pattern[(state.round - 1) % pattern.length];
-  next.move = next.opponent.pp >= MOVES[planned].cost ? planned : "quick";
-  next.opponent.pp -= MOVES[next.move].cost;
+  const { pp, signature } = next.opponent;
+  if (planned === "spark" && signature && pp >= signature.cost) {
+    next.move = "signature";
+    next.opponent.pp -= signature.cost;
+  } else {
+    next.move = pp >= MOVES[planned].cost ? planned : "quick";
+    next.opponent.pp -= MOVES[next.move].cost;
+  }
   next.phase = "block";
   return next;
 }
 
-function resolveTiming(state: BattleState, grade: TimingGrade): BattleState {
+function rollHits(hits: Move["hits"], roll: number): number {
+  if (typeof hits === "number") return hits;
+  const [min, max] = hits;
+  const chance = Number.isFinite(roll) ? Math.max(0, Math.min(roll, 1)) : 0.5;
+  return Math.min(max, min + Math.floor(chance * (max - min + 1)));
+}
+
+function resolveTiming(
+  state: BattleState,
+  grade: TimingGrade,
+  roll = 0.5,
+): BattleState {
   const side: Side = state.phase === "attack" ? "player" : "opponent";
   const other: Side = side === "player" ? "opponent" : "player";
-  const move = MOVES[state.move];
+  const move = getMove(state[side], state.move);
+  if (!move) return state;
   const attackMultiplier =
     side === "opponent" ? 1 : { perfect: 1.5, good: 1, miss: 0.6 }[grade];
   const blockMultiplier =
@@ -202,13 +248,18 @@ function resolveTiming(state: BattleState, grade: TimingGrade): BattleState {
         guardMultiplier,
     ),
   );
-  const damage = Math.min(state[other].hp, perHit * move.hits);
+  const hits = rollHits(move.hits, roll);
+  const damage = Math.min(state[other].hp, perHit * hits);
   const target = { ...state[other], hp: state[other].hp - damage };
   const appliesEffect =
     side === "player" ? grade !== "miss" : grade !== "perfect";
-  if (move.effect === "burn" && appliesEffect) target.burning = 2;
-  if (move.effect === "stun" && grade === "perfect" && side === "player")
-    target.stunned = true;
+  const burns = move.effect === "burn" && appliesEffect;
+  const stuns =
+    move.effect === "stun" &&
+    grade === (side === "player" ? "perfect" : "miss");
+  const tag = appliesEffect ? move.tag : undefined;
+  if (burns) target.burning = 2;
+  if (stuns) target.stunned = true;
   const attacker = { ...state[side] };
   if (!move.cost) attacker.pp = Math.min(attacker.maxPp, attacker.pp + 1);
   if (side === "opponent" && grade === "perfect")
@@ -219,6 +270,15 @@ function resolveTiming(state: BattleState, grade: TimingGrade): BattleState {
       : { perfect: "Perfect block!", good: "Blocked!", miss: "Unblocked." }[
           grade
         ];
+  const hitCount = hits > 1 ? ` across ${hits} hits` : "";
+  const text = [
+    `${feedback} ${attacker.name} uses ${move.name} for ${damage} damage${hitCount}.`,
+    burns && `${target.name} is burning.`,
+    stuns && `${target.name} is stunned.`,
+    tag && `${target.name} is tagged ${tag}.`,
+  ]
+    .filter(Boolean)
+    .join(" ");
   return {
     ...state,
     [side]: attacker,
@@ -230,7 +290,11 @@ function resolveTiming(state: BattleState, grade: TimingGrade): BattleState {
       move: state.move,
       grade,
       damage,
-      text: `${feedback} ${state[side].name} uses ${move.name} for ${damage} damage.${target.stunned ? ` ${target.name} is stunned.` : ""}${move.effect === "burn" && appliesEffect ? ` ${target.name} is burning.` : ""}`,
+      hits,
+      visual: move.visual,
+      art: move.art,
+      tag,
+      text,
     },
   };
 }
@@ -249,12 +313,12 @@ export function battleReducer(
   }
   if (action.type === "timing")
     return state.phase === "attack" || state.phase === "block"
-      ? resolveTiming(state, action.grade)
+      ? resolveTiming(state, action.grade, action.roll)
       : state;
   if (state.phase !== "choose") return state;
   if (action.type === "choose") {
-    const move = MOVES[action.move];
-    if (state.player.pp < move.cost) return state;
+    const move = getMove(state.player, action.move);
+    if (!move || state.player.pp < move.cost) return state;
     return {
       ...state,
       phase: "attack",
