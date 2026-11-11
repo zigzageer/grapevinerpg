@@ -12,16 +12,9 @@ const validRequest = (id) =>
   /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(id);
 
 export class StudioService {
-  constructor({
-    store,
-    generate,
-    secret,
-    baseUrl,
-    fetch: request = globalThis.fetch,
-  }) {
+  constructor({ store, generate, baseUrl, fetch: request = globalThis.fetch }) {
     this.store = store;
     this.generate = generate;
-    this.secret = secret;
     this.baseUrl = baseUrl;
     this.fetch = request;
     this.running = false;

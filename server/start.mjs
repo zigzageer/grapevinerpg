@@ -21,7 +21,6 @@ const store = new StudioStore({
 const service = new StudioService({
   store,
   generate: createImageGenerator({ codexEnv: env }),
-  secret: env.MINT_STUDIO_SECRET,
   baseUrl: env.GAME_BASE_URL || "https://adventures-of-mint.vercel.app",
 });
 const server = createStudioServer({

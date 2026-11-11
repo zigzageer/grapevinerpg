@@ -1292,6 +1292,20 @@ body {
 
 .studio-modal {
   width: min(940px, 100%);
+  background: #fbfaee;
+  color: #294334;
+  border-color: #b4c3a9;
+}
+.studio-modal .modal-heading h2 {
+  color: #294b3a;
+}
+.studio-modal .icon-button {
+  color: #4c674e;
+}
+.studio-modal .button.secondary {
+  background: #e3e9d9;
+  color: #31543b;
+  border-color: #bacbad;
 }
 .studio-heading-row {
   display: flex;
@@ -1464,10 +1478,17 @@ body {
     radial-gradient(ellipse at 50% 90%, #d8e0cf, transparent 48%), #eaf0e5;
   border: 1px solid #dce4d6;
 }
+.studio-stage-empty {
+  height: 140px;
+}
 .studio-character-stage > svg {
   height: 92%;
   width: 85%;
   max-width: 100%;
+}
+.studio-stage-empty > svg {
+  width: 58px;
+  height: 58px;
 }
 .studio-preview > strong {
   color: #2b4b39;
@@ -1523,7 +1544,7 @@ body {
 }
 .studio-history-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   gap: 12px;
 }
 .studio-history-grid > button {
@@ -1589,6 +1610,9 @@ body {
   .studio-character-stage {
     height: 210px;
   }
+  .studio-stage-empty {
+    height: 125px;
+  }
   .studio-heading-row {
     gap: 10px;
   }
@@ -1611,4 +1635,13 @@ body {
   .studio-spinning {
     animation: none;
   }
+}
+
+.studio-modal .icon-button:hover {
+  background: #e6ecdc;
+  color: #31543b;
+}
+.studio-modal .button.secondary:hover {
+  background: #d9e4cb;
+  color: #31543b;
 }

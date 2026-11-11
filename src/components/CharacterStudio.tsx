@@ -59,13 +59,14 @@ export function CharacterStudio({
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [applying, setApplying] = useState(false);
+  const [readingImage, setReadingImage] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [reload, setReload] = useState(0);
   const selection = useRef(0);
   const fileRef = useRef<HTMLInputElement>(null);
   const storageKey = `mint.studio.job.${gameId}`;
-  const busy = submitting || Boolean(pendingId);
+  const busy = readingImage || submitting || Boolean(pendingId);
   const characters = [
     ...(game?.characters || []),
     ...drafts.filter(
@@ -240,6 +241,7 @@ export function CharacterStudio({
   };
   const upload = async (file?: File) => {
     if (!file) return;
+    setReadingImage(true);
     try {
       if (
         !["image/png", "image/jpeg", "image/webp"].includes(file.type) ||
@@ -265,6 +267,8 @@ export function CharacterStudio({
     } catch (e) {
       setError((e as Error).message);
       clearImage();
+    } finally {
+      setReadingImage(false);
     }
   };
 
@@ -358,7 +362,7 @@ export function CharacterStudio({
         <div className="studio-modes" aria-label="Character creation mode">
           <button
             className={mode === "add" ? "selected" : ""}
-            disabled={busy}
+            disabled={busy || !game}
             onClick={addMyself}
           >
             <Plus size={16} /> Add myself
@@ -494,18 +498,22 @@ export function CharacterStudio({
               ) : (
                 <Sparkles size={17} />
               )}
-              {busy
-                ? "Generating…"
-                : preview?.source === "website"
-                  ? "Regenerate"
-                  : mode === "edit"
-                    ? "Generate new version"
-                    : "Generate character"}
+              {readingImage
+                ? "Reading reference…"
+                : busy
+                  ? "Generating…"
+                  : preview?.source === "website"
+                    ? "Regenerate"
+                    : mode === "edit"
+                      ? "Generate new version"
+                      : "Generate character"}
             </button>
           </fieldset>
         </form>
         <section className="studio-preview" aria-label="Character preview">
-          <div className="studio-character-stage">
+          <div
+            className={`studio-character-stage ${preview ? "" : "studio-stage-empty"}`}
+          >
             {preview ? (
               <Portrait
                 c={normalizeCharacter({
@@ -521,9 +529,11 @@ export function CharacterStudio({
           {busy && (
             <p className="studio-progress" role="status">
               <LoaderCircle size={16} className="studio-spinning" />
-              {job?.status === "running"
-                ? "Codex is creating your character…"
-                : "Your character is queued…"}
+              {readingImage
+                ? "Reading your reference…"
+                : job?.status === "running"
+                  ? "Codex is creating your character…"
+                  : "Your character is queued…"}
             </p>
           )}
           {preview && (
