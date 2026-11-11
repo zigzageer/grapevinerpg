@@ -7,7 +7,7 @@ import sharp from "sharp";
 import { StudioStore } from "./studio-store.mjs";
 import { StudioService } from "./studio-service.mjs";
 import { studioGateway } from "./gateway.mjs";
-import { canonicalIp, signature, verifyBridge } from "../bot/studio-bridge.mjs";
+import { canonicalIp, signature, verifyBridge } from "./bridge.mjs";
 
 const base = {
   id: "friend-8",
@@ -30,6 +30,14 @@ const seed = {
   ],
   descriptions: { miel: "Long brown hair and bunny ears" },
 };
+const manifest = (guildId, characters = []) => ({
+  version: 1,
+  guildId,
+  name: "Friends",
+  slug: `friends-${guildId}`,
+  updatedAt: "2026-11-11T00:00:00Z",
+  characters,
+});
 const IP = "203.0.113.25";
 const secret = "local-test-secret-not-a-real-credential";
 const png = await sharp({
@@ -43,7 +51,6 @@ function setup(t, options = {}) {
   const store = new StudioStore({ directory, seed });
   const service = new StudioService({
     store,
-    secret,
     baseUrl: "https://adventures-of-mint.vercel.app",
     generate: async () => png,
     fetch: async () =>
@@ -89,7 +96,7 @@ test("three attempts are atomic, shared across towns and persistent across datab
   assert.equal(second.quota(service.ipHash(IP)).used, 3);
   second.close();
   const guildId = "123456789012345678";
-  await service.discord.create({ guildId, guildName: "A server" });
+  store.importManifest(guildId, manifest(guildId));
   await assert.rejects(service.enqueue(input({ gameId: guildId }), IP), {
     status: 429,
   });
@@ -225,7 +232,7 @@ test("a failed generation preserves the active character and charges the accepte
 test("new characters remain saved drafts until applied and are isolated between servers", async (t) => {
   const { service, store } = setup(t);
   const guildId = "123456789012345678";
-  await service.discord.create({ guildId, guildName: "Friends" });
+  store.importManifest(guildId, manifest(guildId));
   const job = await service.enqueue(
     input({ gameId: guildId, name: "Bob" }),
     IP,
@@ -245,34 +252,67 @@ test("new characters remain saved drafts until applied and are isolated between 
   assert.equal(store.read("mint").characters.length, 2);
 });
 
-test("Discord create/add use the same roster, native generator inputs and generation history", async (t) => {
-  const { service, store } = setup(t);
-  const guildId = "123456789012345678",
-    userId = "223456789012345678";
-  const created = await service.discord.create({
-    guildId,
-    guildName: "Friends",
+test("website towns read published manifests and preserve website versions during bot updates", async (t) => {
+  const guildId = "123456789012345678";
+  const userId = "223456789012345678";
+  let published = manifest(guildId, [
+    {
+      ...base,
+      id: `discord-${userId}`,
+      name: "Server Bob",
+      preset: undefined,
+      sprite: `/games/${guildId}/${userId}.png`,
+    },
+  ]);
+  const requests = [];
+  const { service, store } = setup(t, {
+    fetch: async (url, options) => {
+      requests.push({
+        path: new URL(url).pathname,
+        method: options?.method || "GET",
+      });
+      return new URL(url).pathname.endsWith("game.json")
+        ? Response.json(published)
+        : new Response(png);
+    },
   });
-  assert.equal(created.game.characters.length, 0);
-  const job = await service.enqueueDiscord({
-    guildId,
-    userId,
-    displayName: "Server Bob",
-    usePfp: false,
-    description: "A blue coat",
-  });
-  await done(service);
-  const result = store.job(job.id, null, true);
-  assert.equal(result.status, "succeeded");
-  assert.equal(result.result.character.name, "Server Bob");
-  const character = store.read(guildId).characters[0];
-  assert.match(character.sprite, /^\/api\/studio\/assets\//);
-  assert.equal(result.result.character.sprite, character.sprite);
-  assert.equal(
-    store.history(guildId, `discord-${userId}`).versions[0].description,
-    "A blue coat",
+  const first = await service.loadGame(guildId);
+  assert.equal(first.characters[0].name, "Server Bob");
+  assert.equal((await service.loadGame(guildId)).updatedAt, first.updatedAt);
+  const job = await service.enqueue(
+    input({
+      gameId: guildId,
+      characterId: `discord-${userId}`,
+      name: "Website Bob",
+      useCurrent: false,
+    }),
+    IP,
   );
-  assert.equal(service.quota(IP).used, 0);
+  await done(service);
+  const version = store.job(job.id, service.ipHash(IP)).result.versionId;
+  store.apply(guildId, job.characterId, version);
+  const secondUser = "323456789012345678";
+  published = {
+    ...published,
+    characters: [
+      ...published.characters,
+      {
+        ...base,
+        id: `discord-${secondUser}`,
+        name: "New member",
+        preset: undefined,
+        sprite: `/games/${guildId}/${secondUser}.png`,
+      },
+    ],
+  };
+  const refreshed = await service.loadGame(guildId);
+  assert.deepEqual(
+    refreshed.characters.map((c) => c.name),
+    ["Website Bob", "New member"],
+  );
+  assert.equal(store.history(guildId, job.characterId).versions.length, 2);
+  assert.ok(requests.every((request) => request.method === "GET"));
+  assert.equal(service.quota(IP).used, 1);
 });
 
 test("bridge signatures bind method, path, client IP, timestamp and body", () => {

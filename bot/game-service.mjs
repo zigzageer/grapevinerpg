@@ -135,13 +135,9 @@ export class GameService {
         {
           message: `Add character to server game ${guildId}`,
           sprite: { userId, bytes },
-          generation: { description },
         },
       );
-      const published =
-        result.game.characters.find((member) => member.id === character.id) ||
-        character;
-      return { ...result, character: published, url: this.link(result.game) };
+      return { ...result, character, url: this.link(result.game) };
     });
   }
 }

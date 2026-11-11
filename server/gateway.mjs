@@ -1,4 +1,4 @@
-import { MAX_BODY, bridgeRequest, canonicalIp } from "../bot/studio-bridge.mjs";
+import { MAX_BODY, bridgeRequest, canonicalIp } from "./bridge.mjs";
 
 const gameId = "(?:mint|[0-9]{17,20})";
 const characterId = "[A-Za-z0-9_-]{1,80}";

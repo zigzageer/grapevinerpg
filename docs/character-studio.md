@@ -10,13 +10,13 @@ Each IP gets **three lifetime generation attempts across all towns**. Accepted a
 
 The React site calls `api/studio.mjs`. This Vercel Function proxies a bounded set of public studio routes over HTTPS to the Ubuntu service. Vercel's short-lived OIDC token authenticates the production team and project. The service validates issuer, audience, subject, project ID, team ID, expiration, and signing keys. The gateway forwards Vercel's platform-provided client IP for quota enforcement.
 
-The Ubuntu service serializes image jobs through the existing Codex CLI and saved ChatGPT login. Discord `/game create` and `/game add` use this service through authenticated internal routes. New roster data becomes available immediately through the API. Generated images and history are stored in SQLite plus immutable PNG files.
+The Ubuntu service serializes image jobs through the existing Codex CLI and saved ChatGPT login. For server towns, the website reads their published game manifests and merges website character versions into its own stored roster. New roster data becomes available immediately through the API. Generated images and history are stored in SQLite plus immutable PNG files.
 
-The installed service is `mint-character-studio.service`, with application files in `/opt/mint-studio/app` and persistent data in `/var/lib/mint-studio`. The existing Discord bot loads its bridge settings through a systemd environment-file drop-in. The shared internal credential stays on Ubuntu. Codex child processes receive the existing filtered environment.
+The installed service is `mint-character-studio.service`, with application files in `/opt/mint-studio/app` and persistent data in `/var/lib/mint-studio`. The website service has its own systemd unit and configuration. Its internal diagnostic credential stays on Ubuntu. Codex child processes receive the existing filtered environment.
 
 Vercel production settings include `MINT_STUDIO_ORIGIN` and `MINT_STUDIO_CA`, which contains the public TLS CA certificate. Enable project OIDC with the team issuer. Backend defaults identify the Adventures of Mint project. `MINT_STUDIO_VERCEL_TEAM_SLUG`, `MINT_STUDIO_VERCEL_TEAM_ID`, `MINT_STUDIO_VERCEL_PROJECT_NAME`, and `MINT_STUDIO_VERCEL_PROJECT_ID` support explicitly configured deployments.
 
-Ubuntu settings include `MINT_STUDIO_SECRET`, `MINT_STUDIO_INTERNAL_ORIGIN`, `MINT_STUDIO_CA_PATH`, `MINT_STUDIO_DATA_DIR`, `MINT_STUDIO_SEED_PATH`, `MINT_STUDIO_TLS_KEY`, and `MINT_STUDIO_TLS_CERT`. The service runs Node 22.13+ or 24 and needs `sharp` and `jose`. Generate an initial cast seed with `node scripts/seed-studio.mjs`. Existing data takes precedence over the initial seed.
+Ubuntu settings include `MINT_STUDIO_SECRET`, `MINT_STUDIO_DATA_DIR`, `MINT_STUDIO_SEED_PATH`, `MINT_STUDIO_TLS_KEY`, and `MINT_STUDIO_TLS_CERT`. The service runs Node 22.13+ or 24 and needs `sharp` and `jose`. Generate an initial cast seed with `node scripts/seed-studio.mjs`. Existing data takes precedence over the initial seed.
 
 For a consistent filesystem backup, stop the studio service while it is idle, copy `/var/lib/mint-studio`, then restart the service. Keep the SQLite database and `images` directory together. Preserve `/etc/mint-studio` for TLS and internal connection configuration. The quota salt is stored in the database.
 
@@ -32,6 +32,6 @@ npm run test:studio
 npm run test:e2e
 ```
 
-Studio tests cover persistent quotas, concurrent requests, idempotent retries, uploads, generation failure, original backups, previews, version restoration, Discord integration, bridge authentication, and production-project identity. Browser tests cover adding a reference-based character, editing Miel, exhausting three attempts, restoring history, and adding characters to empty towns in portrait and landscape layouts.
+Studio tests cover persistent quotas, concurrent requests, idempotent retries, uploads, generation failure, original backups, previews, version restoration, published-roster imports, bridge authentication, and production-project identity. Browser tests cover adding a reference-based character, editing Miel, exhausting three attempts, restoring history, and adding characters to empty towns in portrait and landscape layouts.
 
 The implementation follows Vercel's [backend OIDC guide](https://vercel.com/docs/oidc/api) and [trusted client-IP headers](https://vercel.com/docs/headers/request-headers).

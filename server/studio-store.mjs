@@ -121,6 +121,63 @@ export class StudioStore {
     };
   }
 
+  importManifest(gameId, game) {
+    if (
+      !game ||
+      game.version !== 1 ||
+      game.guildId !== gameId ||
+      typeof game.name !== "string" ||
+      !game.name.trim() ||
+      typeof game.slug !== "string" ||
+      !/^[a-z0-9-]+$/.test(game.slug) ||
+      !game.slug.endsWith(`-${gameId}`) ||
+      !Number.isFinite(Date.parse(game.updatedAt)) ||
+      !Array.isArray(game.characters) ||
+      game.characters.length > 24 ||
+      new Set(game.characters.map((character) => character?.id)).size !==
+        game.characters.length ||
+      game.characters.some(
+        (character) =>
+          !character ||
+          !/^discord-\d{17,20}$/.test(character.id) ||
+          typeof character.name !== "string" ||
+          !character.name.trim() ||
+          character.sprite !== `/games/${gameId}/${character.id.slice(8)}.png`,
+      )
+    )
+      throw new StudioError("This town’s published roster could not be read.");
+    const key = `manifest:${gameId}`;
+    const hash = createHash("sha256")
+      .update(JSON.stringify(game))
+      .digest("hex");
+    if (
+      this.db.prepare("SELECT value FROM settings WHERE key=?").get(key)
+        ?.value === hash
+    )
+      return this.read(gameId);
+    const current = this.read(gameId);
+    const characters = new Map(
+      (current?.characters || []).map((character) => [character.id, character]),
+    );
+    for (const character of game.characters) {
+      if (!this.character(gameId, character.id)?.managed)
+        characters.set(character.id, character);
+    }
+    if (characters.size > 24)
+      throw new StudioError("This town already has 24 characters.", 409);
+    const result = this.update(gameId, () => ({
+      ...game,
+      slug: current?.slug || game.slug,
+      characters: [...characters.values()],
+    }));
+    this.db
+      .prepare(
+        "INSERT INTO settings VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+      )
+      .run(key, hash);
+    return result.game;
+  }
+
   touch(gameId) {
     const row = this.db
       .prepare("SELECT metadata FROM games WHERE id=?")
@@ -167,7 +224,7 @@ export class StudioStore {
     return { id, character: snapshot, image, description, source };
   }
 
-  update(gameId, change, { sprite, generation } = {}) {
+  update(gameId, change) {
     return this.transaction(() => {
       const current = this.read(gameId);
       const next = change(current);
@@ -188,25 +245,9 @@ export class StudioStore {
               "INSERT INTO characters(game_id,id,data,created_at) VALUES(?,?,?,?)",
             )
             .run(gameId, character.id, JSON.stringify(character), now());
-          if (!sprite || character.id !== `discord-${sprite.userId}`) {
-            const version = this.addVersion(gameId, character, {
-              source: "original",
-            });
-            this.db
-              .prepare(
-                "UPDATE characters SET current_version=? WHERE game_id=? AND id=?",
-              )
-              .run(version.id, gameId, character.id);
-          }
-        }
-        let active = character;
-        if (sprite && character.id === `discord-${sprite.userId}`) {
           const version = this.addVersion(gameId, character, {
-            bytes: sprite.bytes,
-            description: generation?.description,
-            source: "discord",
+            source: "original",
           });
-          active = version.character;
           this.db
             .prepare(
               "UPDATE characters SET current_version=? WHERE game_id=? AND id=?",
@@ -217,7 +258,7 @@ export class StudioStore {
           .prepare(
             "UPDATE characters SET data=?, visible=1 WHERE game_id=? AND id=?",
           )
-          .run(JSON.stringify(active), gameId, character.id);
+          .run(JSON.stringify(character), gameId, character.id);
       }
       this.touch(gameId);
       return {
@@ -325,9 +366,9 @@ export class StudioStore {
     });
   }
 
-  job(id, ipHash, internal = false) {
+  job(id, ipHash) {
     const row = this.db.prepare("SELECT * FROM jobs WHERE id=?").get(id);
-    if (!row || (!internal && row.ip_hash !== ipHash))
+    if (!row || row.ip_hash !== ipHash)
       throw new StudioError("Generation not found.", 404);
     return {
       id: row.id,

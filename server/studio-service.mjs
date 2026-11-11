@@ -1,7 +1,5 @@
-import { randomUUID } from "node:crypto";
 import sharp from "sharp";
 import { StudioError } from "./studio-store.mjs";
-import { GameService } from "../bot/game-service.mjs";
 import { validateReference } from "../bot/image-generator.mjs";
 
 export const validGameId = (id) => id === "mint" || /^\d{17,20}$/.test(id);
@@ -19,7 +17,6 @@ export class StudioService {
     this.fetch = request;
     this.running = false;
     this.closing = false;
-    this.discord = new GameService({ store, generate, baseUrl });
     store.recoverJobs();
   }
 
@@ -36,6 +33,31 @@ export class StudioService {
     if (!game)
       throw new StudioError("This town has not been created yet.", 404);
     return game;
+  }
+
+  async loadGame(id) {
+    if (!validGameId(id)) throw new StudioError("Invalid game ID.");
+    if (id !== "mint") {
+      try {
+        const response = await this.fetch(
+          new URL(`/games/${id}/game.json`, this.baseUrl),
+          {
+            cache: "no-store",
+            redirect: "error",
+            signal: AbortSignal.timeout(5000),
+          },
+        );
+        if (
+          response.ok &&
+          response.headers.get("content-type")?.includes("application/json")
+        )
+          this.store.importManifest(id, await response.json());
+      } catch (error) {
+        if (error instanceof StudioError) throw error;
+        // Saved website characters remain available during a deployment outage.
+      }
+    }
+    return this.game(id);
   }
 
   async enqueue(input, ip) {
@@ -170,26 +192,21 @@ export class StudioService {
         this.store.startJob(job.id);
         try {
           const payload = JSON.parse(job.payload);
-          if (job.source === "discord") {
-            const result = await this.discord.add(payload);
-            this.store.finishJob(job.id, result);
-          } else {
-            const references = [];
-            // Preserve an original snapshot even when it is excluded from the prompt.
-            const original = await this.currentReference(job, payload);
-            if (payload.useCurrent && original) references.push(original);
-            if (payload.image)
-              references.push({
-                bytes: Buffer.from(payload.image.base64, "base64"),
-                type: payload.image.type,
-              });
-            const bytes = await this.generate({
-              name: payload.name,
-              description: payload.description,
-              references,
+          const references = [];
+          // Preserve an original snapshot even when it is excluded from the prompt.
+          const original = await this.currentReference(job, payload);
+          if (payload.useCurrent && original) references.push(original);
+          if (payload.image)
+            references.push({
+              bytes: Buffer.from(payload.image.base64, "base64"),
+              type: payload.image.type,
             });
-            this.store.finishGeneration(job, bytes, payload.description);
-          }
+          const bytes = await this.generate({
+            name: payload.name,
+            description: payload.description,
+            references,
+          });
+          this.store.finishGeneration(job, bytes, payload.description);
         } catch (error) {
           const message =
             error instanceof StudioError
@@ -202,36 +219,6 @@ export class StudioService {
     } finally {
       this.running = false;
     }
-  }
-
-  async enqueueDiscord(input) {
-    const game = this.game(input.guildId);
-    if (!/^\d{17,20}$/.test(input.userId))
-      throw new StudioError("Invalid Discord member.");
-    if (game.characters.some((c) => c.id === `discord-${input.userId}`))
-      throw new StudioError(
-        "This member already has a character in this server’s game.",
-        409,
-      );
-    const template = this.game("mint").characters.find(
-      (c) => c.kind !== "mint",
-    );
-    const character = {
-      ...template,
-      id: `discord-${input.userId}`,
-      name: input.name || input.displayName,
-      preset: undefined,
-      sprite: undefined,
-    };
-    const result = this.store.enqueue({
-      id: randomUUID(),
-      gameId: input.guildId,
-      character,
-      payload: input,
-      source: "discord",
-    });
-    void this.drain();
-    return result;
   }
 
   close() {

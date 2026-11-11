@@ -1,6 +1,6 @@
 import http from "node:http";
 import https from "node:https";
-import { MAX_BODY, verifyBridge, canonicalIp } from "../bot/studio-bridge.mjs";
+import { MAX_BODY, verifyBridge, canonicalIp } from "./bridge.mjs";
 import { StudioError } from "./studio-store.mjs";
 
 export function createStudioServer({ service, secret, tls, verifyVercel }) {
@@ -76,7 +76,7 @@ export function createStudioServer({ service, secret, tls, verifyVercel }) {
           return;
         }
         if (parts[0] === "games" && parts.length === 2) {
-          send(200, service.game(parts[1]));
+          send(200, await service.loadGame(parts[1]));
           return;
         }
         if (
@@ -96,14 +96,6 @@ export function createStudioServer({ service, secret, tls, verifyVercel }) {
         }
         if (parts[0] === "jobs" && parts.length === 2) {
           send(200, service.store.job(parts[1], service.ipHash(ip)));
-          return;
-        }
-        if (
-          parts[0] === "internal" &&
-          parts[1] === "jobs" &&
-          parts.length === 3
-        ) {
-          send(200, service.store.job(parts[2], null, true));
           return;
         }
         if (
@@ -133,14 +125,6 @@ export function createStudioServer({ service, secret, tls, verifyVercel }) {
         ) {
           service.game(parts[1]);
           send(200, service.store.apply(parts[1], parts[3], input.versionId));
-          return;
-        }
-        if (url.pathname === "/internal/create") {
-          send(200, await service.discord.create(input));
-          return;
-        }
-        if (url.pathname === "/internal/add") {
-          send(202, await service.enqueueDiscord(input));
           return;
         }
       }
