@@ -33,6 +33,7 @@ export interface SaveGame {
   version: 1;
   castVersion: 7;
   activeCharacter?: string;
+  tvLook?: boolean;
   player: Point;
   crew: Character[];
   greeted: boolean;
@@ -278,6 +279,7 @@ export const initialSave = (): SaveGame => ({
   version: 1,
   castVersion: 7,
   activeCharacter: "you",
+  tvLook: true,
   player: { ...START },
   crew: DEFAULT_CREW.map((c) => ({ ...c })),
   greeted: false,
@@ -407,6 +409,18 @@ export function movePlayer(p: Point, dx: number, dy: number): Point {
   const y = canStand({ x, y: p.y + dy }) ? p.y + dy : p.y;
   return { x, y };
 }
+/** Consume movement in short steps so slower frames cannot skip over obstacles. */
+export function movePlayerInSteps(p: Point, dx: number, dy: number): Point {
+  const count = Math.max(
+    1,
+    Math.ceil(Math.max(Math.abs(dx), Math.abs(dy)) / 8),
+  );
+  let next = p;
+  for (let i = 0; i < count; i++)
+    next = movePlayer(next, dx / count, dy / count);
+  return next;
+}
+
 export function loadSave(): SaveGame {
   try {
     const raw = JSON.parse(localStorage.getItem(SAVE_KEY) || "null");
@@ -482,6 +496,7 @@ export function loadSave(): SaveGame {
     return {
       version: 1,
       castVersion: 7,
+      tvLook: raw.tvLook !== false,
       activeCharacter:
         typeof raw.activeCharacter === "string" &&
         crew.some(

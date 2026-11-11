@@ -8,6 +8,7 @@ import "@fontsource/fredoka/500.css";
 import "@fontsource/fredoka/600.css";
 import App from "./App";
 import "./styles.css";
+import "./game-screen.css";
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <App />

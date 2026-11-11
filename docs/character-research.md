@@ -56,3 +56,11 @@ The current demo replaces the story flow with a character picker and free roamin
 The standalone `artifacts/adventures-of-mint.html` embeds the complete game, fonts and art. Validation exercised all characters on desktop, touch controls and camera on phone, workshop editing, save/reload, and standalone gameplay with network disabled after the initial document loaded. Direct `file://` navigation was blocked by this managed Chromium's administrator policy, so the artifact's exact bytes were served as a single document for the network-disabled browser check.
 
 The environment reports desktop support enabled, but neither a desktop JavaScript control tool nor `open_in_codex` is offered here. `cloud-agent-desktop --help` returned “Orbit desktop is unavailable” for environment `ccarenv_b64_Y2NhcmVudl84NmY5ZjFlOTY3NTA4MTkxYWNlMjk3MWRjMDQ0NDkxZQ`. A downloadable standalone game is provided so play does not depend on that preview runtime.
+
+## Full-screen game and TV treatment
+
+The website-style frame has been replaced with an edge-to-edge game viewport, a compact player HUD, a pause menu, and an overlay character picker. The world supports a thumbstick and simultaneous hold-to-run input, viewport resizing and safe areas, and portrait/landscape framing. A web app manifest, Apple metadata, and icons support iPhone Home Screen launch. Safari's browser bars are removed by opening the installed Home Screen web app, rather than by an unsupported native fullscreen call.
+
+A default-on TV treatment applies saturation/contrast, static paper grain, light broadcast lines, and subtle edge shading to the game world. It does not filter the HUD. The switch in Pause persists in local saves.
+
+For this cloud session, WebKit was downloaded from the official Playwright CDN. Missing Debian libraries were extracted into a user-owned directory after verifying the signed Debian release, its package-index checksum, and each package's SHA-256. Dynamic loading of the required libraries was verified. The actual bundled WebKit executable is launched with those library paths because its normal wrapper replaces `LD_LIBRARY_PATH`; no application assertions or TLS verification are disabled.

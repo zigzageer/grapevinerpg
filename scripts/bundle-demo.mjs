@@ -38,7 +38,7 @@ const css = fs
 const js = fs
   .readFileSync(path.join(dist, jsFile), "utf8")
   .replace(/<\/script/gi, "<\\/script");
-const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Adventures of Mint — Play the Demo</title><link rel="icon" href="${dataURL(path.join(dist, "favicon.svg"))}"><style>${css}</style></head><body><div id="root"></div><script>globalThis.__MINT_ART__=${JSON.stringify(artwork)};</script><script type="module">${js}</script></body></html>`;
+const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Adventures of Mint — Play the Demo</title><link rel="icon" href="${dataURL(path.join(dist, "favicon.svg"))}"><style>${css}</style></head><body><div id="root"></div><script>globalThis.__MINT_ART__=${JSON.stringify(artwork)};</script><script type="module">${js}</script></body></html>`;
 fs.mkdirSync(path.join(root, "artifacts"), { recursive: true });
 const output = path.join(root, "artifacts", "adventures-of-mint.html");
 fs.writeFileSync(output, html);

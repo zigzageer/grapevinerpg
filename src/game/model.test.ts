@@ -5,6 +5,7 @@ import {
   loadSave,
   DEFAULT_CREW,
   movePlayer,
+  movePlayerInSteps,
   normalizeCharacter,
   parseCrew,
   START,
@@ -184,4 +185,12 @@ describe("cast updates and saved characters", () => {
       vi.unstubAllGlobals();
     }
   });
+});
+
+it("large movement updates cannot skip through the fountain", () => {
+  const stopped = movePlayerInSteps({ x: 570, y: 710 }, 230, 0);
+  expect(stopped.x).toBeLessThan(595);
+  expect(stopped.x).toBeGreaterThan(580);
+  expect(stopped.y).toBe(710);
+  expect(canStand(stopped)).toBe(true);
 });

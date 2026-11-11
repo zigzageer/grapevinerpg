@@ -41,6 +41,22 @@ describe("character follow camera", () => {
       close = followCamera(START, 14 / 9, 4);
     expect(close.height).toBeLessThan(normal.height);
     expect((START.x - close.x) / close.width).toBeCloseTo(0.5);
-    expect((START.y - close.y) / close.height).toBeCloseTo(0.66);
+    expect((START.y - 42 - close.y) / close.height).toBeCloseTo(0.52);
   });
+});
+
+it("keeps characters a usable size in fullscreen desktop, phone portrait, and phone landscape", () => {
+  for (const { width, height } of [
+    { width: 1440, height: 900 },
+    { width: 390, height: 844 },
+    { width: 844, height: 390 },
+  ]) {
+    const view = followCamera(START, width / height, DEFAULT_ZOOM, height);
+    const pixelsPerUnit = height / view.height;
+    const characterHeight = 86 * pixelsPerUnit;
+    expect(characterHeight).toBeGreaterThan(100);
+    expect(characterHeight).toBeLessThan(200);
+    expect((START.y - 42 - view.y) / view.height).toBeCloseTo(0.52);
+    expect(view.width / view.height).toBeCloseTo(width / height);
+  }
 });
