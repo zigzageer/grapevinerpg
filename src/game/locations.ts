@@ -3,6 +3,8 @@ import type { Point } from "./model";
 export const TOWN_NAME = "South Park";
 export const WORLD = { width: 2400, height: 2100 };
 export const WALK_BOUNDS = { left: 40, right: 2360, top: 515, bottom: 2050 };
+export const STREET_ROWS = [530, 1200, 1930] as const;
+export const STREET_WIDTH = 130;
 export type Footprint = { x: number; y: number; w: number; h: number };
 export interface TownLocation {
   id: string;

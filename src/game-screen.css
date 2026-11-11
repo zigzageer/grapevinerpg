@@ -48,7 +48,7 @@ body {
   display: block;
 }
 .play-screen[data-tv-look="true"] .world-layer {
-  filter: saturate(1.18) contrast(1.055) brightness(1.015);
+  filter: saturate(1.045) contrast(1.025) brightness(1.008);
 }
 .episode-treatment {
   position: absolute;
@@ -1110,6 +1110,54 @@ body {
   .game-switch > span,
   .game-modal {
     transition: none;
+    animation: none;
+  }
+}
+
+.resident-dialogue-line {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.15rem;
+}
+.resident-dialogue-line svg {
+  flex: 0 0 76px;
+  width: 76px;
+  height: 100px;
+  border-radius: 14px;
+  padding: 6px;
+  background: #e4ebe3;
+}
+.resident-dialogue-line p {
+  margin: 0;
+  font-size: 1.05rem;
+  line-height: 1.5;
+}
+.resident-steps,
+.resident-watching {
+  transform-box: fill-box;
+  transform-origin: center bottom;
+}
+.resident-steps {
+  animation: resident-step 0.32s steps(2, end) infinite alternate;
+}
+.resident-watching {
+  transform: rotate(3deg);
+}
+.town-svg[data-paused="true"] :is(.paper-person, .resident-steps) {
+  animation-play-state: paused;
+}
+@keyframes resident-step {
+  from {
+    transform: rotate(-1deg);
+  }
+  to {
+    transform: translateY(-1.35px) rotate(1deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .resident-steps,
+  [data-parade] .walking {
     animation: none;
   }
 }

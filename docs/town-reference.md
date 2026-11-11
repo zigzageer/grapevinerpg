@@ -29,6 +29,13 @@ ChatGPT image generation used those reference images to redraw front-facing, tra
 
 The streets, mountains, snow, pines, directional signs, and bus-stop post are drawn in SVG. Characters, touch input, camera framing, and the optional TV treatment are retained. All assets load locally, with no requests to the reference sites during play. The downloadable demo embeds the scenery along with the cast.
 
+## Town residents
+
+The wandering residents use character art from the South Park Studios wiki. The local PNGs in `public/characters/resident-*.png` are trimmed to their visible bounds and resized, with the source colors and aspect ratios preserved. The kids share a common scale. Randy uses a taller scale, and every cutout is anchored at its feet in the town.
+
+- [Eric Cartman](https://southpark.cc.com/wiki/Eric_Cartman), [Stan Marsh](https://southpark.cc.com/wiki/Stan_Marsh), [Kyle Broflovski](https://southpark.cc.com/wiki/Kyle_Broflovski), and [Kenny McCormick](https://southpark.cc.com/wiki/Kenny_McCormick)
+- [Butters Stotch](https://southpark.cc.com/wiki/Butters_Stotch), [Wendy Testaburger](https://southpark.cc.com/wiki/Wendy_Testaburger), and [Randy Marsh](https://southpark.cc.com/wiki/Randy_Marsh)
+
 ## Renaming later
 
 Edit the `name` and optional `shortName` fields in `src/game/locations.ts`. These names drive the map and live SVG signage. Coffee and police signs include a fixed category subtitle; those subtitles can be changed in `Town.tsx` when rebranding. Renaming text does not require image generation. Location IDs are stable, and footprints and entrance coordinates stay independent of the displayed names.

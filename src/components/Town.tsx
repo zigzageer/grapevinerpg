@@ -1,10 +1,24 @@
-import { memo } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import type { Character, Point } from "../game/model";
 import { characterKey } from "../game/model";
 import type { CameraView } from "../game/camera";
 import { CharacterArt } from "./Character";
 import { sceneryArtUrl } from "../game/art";
-import { WORLD, TOWN_NAME, location } from "../game/locations";
+import {
+  WORLD,
+  TOWN_NAME,
+  STREET_ROWS,
+  STREET_WIDTH,
+  location,
+} from "../game/locations";
+import {
+  advanceTownLife,
+  createTownLife,
+  streetTraffic,
+  winterParade,
+  type ResidentConversation,
+} from "../game/town-life";
+import { TownResident, TownShadow, TownVehicle } from "./TownLife";
 
 function Pine({ x, y, s = 1 }: Point & { s?: number }) {
   return (
@@ -97,7 +111,7 @@ const Scenery = memo(function Scenery({ townName }: { townName: string }) {
         strokeWidth="3"
         strokeDasharray="30 23"
       />
-      {[530, 1200, 1930].map((y) => (
+      {STREET_ROWS.map((y) => (
         <g key={y}>
           <rect
             x="0"
@@ -106,7 +120,13 @@ const Scenery = memo(function Scenery({ townName }: { townName: string }) {
             height="184"
             fill="#bec2cd"
           />
-          <rect x="0" y={y} width={WORLD.width} height="130" fill="#53525b" />
+          <rect
+            x="0"
+            y={y}
+            width={WORLD.width}
+            height={STREET_WIDTH}
+            fill="#53525b"
+          />
           <path
             d={`M0 ${y + 65}H2400`}
             stroke="#e9cb68"
@@ -366,6 +386,8 @@ interface Props {
   target: Point | null;
   onMove: (point: Point) => void;
   onSelect: (character: Character) => void;
+  onTalk?: (conversation: ResidentConversation) => void;
+  paused?: boolean;
   townName?: string;
 }
 const CITIZEN_SPOTS: Point[] = [
@@ -404,20 +426,73 @@ export function Town({
   target,
   onMove,
   onSelect,
+  onTalk,
+  paused = false,
   townName = TOWN_NAME,
 }: Props) {
-  const entities = crew
-    .map((c, i) => ({
+  const [life, setLife] = useState(createTownLife);
+  const live = useRef(life);
+  const hasLife = !!onTalk;
+  useEffect(() => {
+    if (!hasLife || paused) return;
+    let frame = 0;
+    let last: number | undefined;
+    const tick = (now: number) => {
+      if (last === undefined || document.hidden) last = now;
+      if (now - last >= 32) {
+        live.current = advanceTownLife(
+          live.current,
+          Math.min((now - last) / 1000, 0.1),
+        );
+        setLife(live.current);
+        last = now;
+      }
+      frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [hasLife, paused]);
+  const vehicles = useMemo(
+    () => (hasLife ? [...streetTraffic(life.time), ...winterParade(life.time)] : []),
+    [hasLife, life.time],
+  );
+  const entities = [
+    ...crew.map((c, i) => ({
+      kind: "crew" as const,
       c,
       key: characterKey(c),
       ...(characterKey(c) === activeKey
         ? player
         : CITIZEN_SPOTS[i % CITIZEN_SPOTS.length]),
-    }))
-    .sort((a, b) => a.y - b.y);
+    })),
+    ...(onTalk
+      ? life.residents.map((walker) => ({
+          kind: "resident" as const,
+          key: `resident-${walker.resident.id}`,
+          y: walker.y,
+          walker,
+          onTalk,
+        }))
+      : []),
+    ...vehicles
+      .filter(
+        ({ x, y }) =>
+          x >= camera.x - 115 &&
+          x <= camera.x + camera.width + 115 &&
+          y >= camera.y - 10 &&
+          y <= camera.y + camera.height + 110,
+      )
+      .map((vehicle) => ({
+        kind: "vehicle" as const,
+        key: vehicle.id,
+        y: vehicle.y,
+        vehicle,
+      })),
+  ].sort((a, b) => a.y - b.y);
   return (
     <svg
       data-testid="town"
+      data-paused={paused}
       className="town-svg"
       viewBox={`${camera.x} ${camera.y} ${camera.width} ${camera.height}`}
       aria-label={`${townName} free-roam town. Click the ground to walk or a character to interact with them.`}
@@ -431,6 +506,13 @@ export function Town({
         onMove({ x: p.x, y: p.y });
       }}
     >
+      <defs>
+        <radialGradient id="town-ground-shadow" cy="42%">
+          <stop stopColor="#253039" stopOpacity=".45" />
+          <stop offset=".55" stopColor="#253039" stopOpacity=".27" />
+          <stop offset="1" stopColor="#253039" stopOpacity="0" />
+        </radialGradient>
+      </defs>
       <Scenery townName={townName} />
       {target && (
         <g
@@ -449,6 +531,19 @@ export function Town({
         </g>
       )}
       {entities.map((e) => {
+        if (e.kind === "vehicle") {
+          return <TownVehicle key={e.key} vehicle={e.vehicle} />;
+        }
+        if (e.kind === "resident") {
+          return (
+            <TownResident
+              key={e.key}
+              walker={e.walker}
+              camera={camera}
+              onTalk={e.onTalk}
+            />
+          );
+        }
         const active = e.key === activeKey;
         return (
           <g
@@ -472,15 +567,18 @@ export function Town({
             {active && (
               <ellipse
                 cx={e.x}
-                cy={e.y + 1}
-                rx="30"
-                ry="9"
-                fill="#eaf2b4"
-                opacity=".5"
+                cy={e.y + 2}
+                rx="27"
+                ry="7"
+                fill="none"
+                stroke="#edf2bc"
+                strokeWidth="1.6"
+                opacity=".58"
               />
             )}
+            <TownShadow x={e.x} y={e.y} rx={23} ry={5.5} />
             <g
-              transform={`translate(${e.x - 36} ${e.y - 90}) scale(.48)`}
+              transform={`translate(${e.x - 36} ${e.y - 86.4}) scale(.48)`}
               data-testid={active ? "player-sprite" : undefined}
               data-character={e.key}
               data-x={active ? player.x : undefined}
