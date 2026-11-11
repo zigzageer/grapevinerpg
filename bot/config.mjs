@@ -1,8 +1,4 @@
 export function gameConfig(env = process.env) {
-  const required = (key) => {
-    if (!env[key]?.trim()) throw new Error(`Set ${key} on the bot host.`);
-    return env[key].trim();
-  };
   const repository = env.GAME_GITHUB_REPOSITORY || "zigzageer/grapevinerpg";
   if (!/^[\w.-]+\/[\w.-]+$/.test(repository))
     throw new Error("Invalid GAME_GITHUB_REPOSITORY.");
@@ -14,10 +10,15 @@ export function gameConfig(env = process.env) {
   return {
     repository,
     branch: env.GAME_GITHUB_BRANCH || "main",
-    token: required("GAME_GITHUB_TOKEN"),
     baseUrl: origin.origin,
-    openaiKey: env.OPENAI_API_KEY,
-    imageModel: env.GAME_IMAGE_MODEL || "gpt-image-2.6-flare",
+    codexEnv: env,
+    vercel: {
+      teamId: env.GAME_VERCEL_TEAM_ID || "team_YMxRg3j0ixQCGCc8wjrgWSZz",
+      projectId:
+        env.GAME_VERCEL_PROJECT_ID || "prj_0VQ70aDKzQcB17HfOjJ8UG1U6BL5",
+      projectName: env.GAME_VERCEL_PROJECT_NAME || "adventures-of-mint",
+      repositoryId: Number(env.GAME_GITHUB_REPOSITORY_ID || "1453541021"),
+    },
     allowedUserIds: new Set(
       (env.GAME_ALLOWED_USER_IDS || "")
         .split(",")

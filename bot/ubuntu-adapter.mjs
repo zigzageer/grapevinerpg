@@ -6,8 +6,7 @@ export const gameDefinition = {
   dm_permission: false,
 };
 
-// Configure on first use so missing game credentials cannot prevent the existing
-// Discord bot from starting. Reuse the bot's configured owner across servers.
+// Initialize on first use and reuse the bot's configured owner across servers.
 export function createUbuntuGameHandler({
   ownerId,
   env = process.env,

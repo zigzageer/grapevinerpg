@@ -1,7 +1,14 @@
 import { gameConfig } from "./config.mjs";
-import { GitHubGameStore } from "./github-store.mjs";
+import { CodexGameStore } from "./codex-store.mjs";
 import { createImageGenerator } from "./image-generator.mjs";
 import { GameService } from "./game-service.mjs";
+
+function publishingMessage(result) {
+  if (result.deployment?.state === "READY") return "The game is live.";
+  if (result.deployment?.state === "FAILED")
+    return "The game is saved in GitHub, but Vercel publishing failed. Run /game create to retry publishing.";
+  return "Vercel is publishing the update. The game refreshes automatically when it is ready.";
+}
 
 // Raw Discord command JSON can be registered alongside an existing bot's commands.
 export const gameCommand = {
@@ -95,7 +102,7 @@ export function createGameCommandHandler({
         });
         await interaction.editReply(
           reply(
-            `${result.existing ? "This server already has a game" : "Created this server’s town with 0 characters"}:\n${result.url}\n${result.existing ? "" : "It will be available after Vercel finishes publishing. "}Add a friend with /game add user:@friend.`,
+            `${result.existing ? "This server already has a game" : "Created this server’s town with 0 characters"}:\n${result.url}\n${publishingMessage(result)}\nAdd a friend with /game add user:@friend.`,
           ),
         );
       } else if (command === "add") {
@@ -131,7 +138,7 @@ export function createGameCommandHandler({
         });
         await interaction.editReply(
           reply(
-            `Added **${result.character.name.replace(/([*_~`\\])/g, "\\$1")}** to this server’s game.\n${result.url}\nThe artwork is committed. It will appear after Vercel finishes publishing.`,
+            `Added **${result.character.name.replace(/([*_~`\\])/g, "\\$1")}** to this server’s game.\n${result.url}\n${publishingMessage(result)}`,
           ),
         );
       } else throw new Error("Unknown /game command.");
@@ -152,7 +159,7 @@ export function configuredGameHandler(env = process.env) {
   const config = gameConfig(env);
   return createGameCommandHandler({
     service: new GameService({
-      store: new GitHubGameStore(config),
+      store: new CodexGameStore(config),
       generate: createImageGenerator(config),
       baseUrl: config.baseUrl,
     }),

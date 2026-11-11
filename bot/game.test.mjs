@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import sharp from "sharp";
+import { writeFile, access, symlink } from "node:fs/promises";
+import path from "node:path";
 import { GameService, serverSlug } from "./game-service.mjs";
 import { GitHubGameStore } from "./github-store.mjs";
 import { createGameCommandHandler, gameCommand } from "./game-command.mjs";
@@ -370,14 +372,27 @@ test("sprite processing crops empty margins, preserves alpha and rejects opaque 
   await assert.rejects(() => prepareSprite(opaque), /transparent background/);
 });
 
-test("name/description-only generation uses the image API without an avatar request", async () => {
-  const calls = [],
-    png = await transparentCharacter();
+test("character generation uses the existing Codex login and native image prompt", async () => {
+  const png = await transparentCharacter();
+  let worker;
   const generate = createImageGenerator({
-    openaiKey: "test-key",
-    fetch: async (url, options) => {
-      calls.push({ url, options });
-      return Response.json({ data: [{ b64_json: png.toString("base64") }] });
+    codexEnv: {
+      CODEX_ENABLED: "true",
+      CODEX_HOME: "/saved/codex",
+      OPENAI_API_KEY: "unused-key",
+      CODEX_API_KEY: "unused-code-key",
+    },
+    fetch: async () => assert.fail("No image provider request should be made"),
+    runnerFactory: (options) => {
+      worker = options;
+      return {
+        run: async () => {
+          assert.match(options.promptForTask(), /image_gen__imagegen/);
+          assert.match(options.promptForTask(), /Blue hat/);
+          await writeFile(path.join(options.workdir, "sprite.png"), png);
+          return { status: "completed" };
+        },
+      };
     },
   });
   const result = await generate({
@@ -386,25 +401,31 @@ test("name/description-only generation uses the image API without an avatar requ
     references: [],
   });
   assert.ok(result.length > 0);
-  assert.equal(calls.length, 1);
-  assert.match(calls[0].url, /images\/generations$/);
-  const body = JSON.parse(calls[0].options.body);
-  assert.match(body.prompt, /Blue hat/);
-  assert.equal(body.background, "transparent");
+  assert.equal(worker.env.CODEX_HOME, "/saved/codex");
+  assert.equal("OPENAI_API_KEY" in worker.env, false);
+  assert.equal("CODEX_API_KEY" in worker.env, false);
+  assert.deepEqual(worker.extraArgs, ["--skip-git-repo-check"]);
+  await assert.rejects(() => access(worker.workdir), { code: "ENOENT" });
 });
 
-test("avatar and uploaded image generation sends both images to the edit endpoint", async () => {
-  const calls = [],
-    png = await transparentCharacter();
+test("avatar and uploaded references become local image attachments for Codex", async () => {
+  const png = await transparentCharacter(),
+    calls = [];
   const generate = createImageGenerator({
-    openaiKey: "test-key",
-    fetch: async (input, options) => {
-      const url = String(input);
-      calls.push({ url, options });
-      if (url.startsWith("https://cdn.discordapp.com"))
-        return new Response(png, { headers: { "content-type": "image/png" } });
-      return Response.json({ data: [{ b64_json: png.toString("base64") }] });
+    fetch: async (url) => {
+      calls.push(String(url));
+      return new Response(png, { headers: { "content-type": "image/png" } });
     },
+    runnerFactory: (options) => ({
+      run: async () => {
+        assert.equal(
+          options.extraArgs.filter((arg) => arg === "--image").length,
+          2,
+        );
+        await writeFile(path.join(options.workdir, "sprite.png"), png);
+        return { status: "completed" };
+      },
+    }),
   });
   await generate({
     name: "Bob",
@@ -413,8 +434,40 @@ test("avatar and uploaded image generation sends both images to the edit endpoin
       { url: "https://cdn.discordapp.com/upload.png" },
     ],
   });
-  const call = calls.find((c) => c.url.startsWith("https://api.openai.com"));
-  assert.match(call.url, /images\/edits$/);
-  assert.equal(call.options.body.getAll("image[]").length, 2);
-  assert.equal(call.options.body.get("background"), "transparent");
+  assert.equal(calls.length, 2);
+  assert.ok(
+    calls.every((url) => url.startsWith("https://cdn.discordapp.com/")),
+  );
+});
+
+test("failed Codex jobs and absent output are reported without accepting a sprite", async () => {
+  for (const status of ["failed", "completed"]) {
+    let directory;
+    const generate = createImageGenerator({
+      runnerFactory: (options) => {
+        directory = options.workdir;
+        return { run: async () => ({ status }) };
+      },
+    });
+    await assert.rejects(
+      () => generate({ name: "Bob", references: [] }),
+      /Codex/,
+    );
+    await assert.rejects(() => access(directory), { code: "ENOENT" });
+  }
+});
+
+test("a Codex output symlink cannot be read as a character file", async () => {
+  const generate = createImageGenerator({
+    runnerFactory: (options) => ({
+      run: async () => {
+        await symlink("/etc/passwd", path.join(options.workdir, "sprite.png"));
+        return { status: "completed" };
+      },
+    }),
+  });
+  await assert.rejects(
+    () => generate({ name: "Bob", references: [] }),
+    /usable character PNG/,
+  );
 });

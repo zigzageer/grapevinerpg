@@ -4,7 +4,7 @@
 
 A full-screen 2D browser game starring Mint and the whole cast. Open the game and start walking. The world fills the display; character selection, controls, and editing live in in-game overlays. This free-roam demo has no story or quests yet.
 
-**Discord server games:** the engine also supports a separate empty town and cast for each Discord server. The `/game create` and `/game add` bot modules generate characters from server nicknames, avatars, descriptions, and uploaded references, then commit each roster update for Vercel to publish. See [bot integration and setup](docs/discord-games.md). Bot activation requires connecting these modules to the existing Discord bot and configuring its host credentials.
+Each Discord server can have its own empty town and cast. The `/game create` and `/game add` bot modules use the VPS Codex CLI and its saved ChatGPT login to generate characters from server nicknames, avatars, descriptions, and uploaded references. Codex commits each roster update and starts a production build through the connected GitHub and Vercel apps. See [bot integration and setup](docs/discord-games.md).
 
 The engine is custom **React + TypeScript + SVG**, with a frame-based movement loop, collision checks, A\* pathfinding, and a character-follow camera. It does not use Phaser, Unity, or a third-party game engine.
 
