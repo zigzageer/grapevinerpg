@@ -5,6 +5,7 @@ import {
   serverIdFromPath,
   type ServerGame,
 } from "../game/server";
+import { CharacterStudio } from "./CharacterStudio";
 import { Town } from "./Town";
 import { followCamera, DEFAULT_ZOOM } from "../game/camera";
 import { START } from "../game/model";
@@ -24,23 +25,38 @@ export function ServerLoader({
   const [server, setServer] = useState<ServerGame>();
   const [error, setError] = useState("");
   const [attempt, setAttempt] = useState(0);
+  const [studioOpen, setStudioOpen] = useState(false);
   useEffect(() => {
     if (isDemo || !guildId) return;
     const controller = new AbortController();
+    let loadedFromStudio = false;
     const fetchGame = async () => {
       try {
-        const response = await fetch(`/games/${guildId}/game.json`, {
+        let response = await fetch(`/api/studio/games/${guildId}`, {
           cache: "no-store",
           signal: controller.signal,
         });
-        if (!response.ok)
+        const fromStudio =
+          response.ok &&
+          response.headers.get("content-type")?.includes("application/json");
+        if (!fromStudio && !loadedFromStudio)
+          response = await fetch(`/games/${guildId}/game.json`, {
+            cache: "no-store",
+            signal: controller.signal,
+          });
+        if (!response.ok || (loadedFromStudio && !fromStudio))
           throw new Error(
             response.status === 404
               ? "This game isn’t available yet. If you just created it, give it a moment to publish."
               : "The game couldn’t load. Check your connection and try again.",
           );
         const next = parseServerGame(await response.json(), guildId);
-        setServer((old) => (old?.updatedAt === next.updatedAt ? old : next));
+        if (fromStudio) loadedFromStudio = true;
+        setServer((old) =>
+          old && Date.parse(old.updatedAt) >= Date.parse(next.updatedAt)
+            ? old
+            : next,
+        );
         setError("");
       } catch (e) {
         if (!controller.signal.aborted)
@@ -99,9 +115,15 @@ export function ServerLoader({
           <>
             <p>
               A fresh town with <strong>0 characters</strong>. Bring your first
-              friend into the game from Discord.
+              friend into the game.
             </p>
-            <code>/game add user:@friend</code>
+            <button
+              className="button primary"
+              onClick={() => setStudioOpen(true)}
+            >
+              Add yourself
+            </button>
+            <code>Or use /game add user:@friend in Discord</code>
             <p className="server-hint">
               New characters appear here when they’re ready.
             </p>
@@ -124,6 +146,16 @@ export function ServerLoader({
         )}
         <a href="/">Visit Adventures of Mint</a>
       </section>
+      {studioOpen && guildId && (
+        <CharacterStudio
+          gameId={guildId}
+          onClose={() => setStudioOpen(false)}
+          onPublished={(game) => {
+            setServer(parseServerGame(game, guildId));
+            setStudioOpen(false);
+          }}
+        />
+      )}
     </main>
   );
 }

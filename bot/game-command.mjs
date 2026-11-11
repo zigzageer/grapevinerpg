@@ -1,3 +1,4 @@
+import { createStudioDiscordService } from "./studio-client.mjs";
 import { gameConfig } from "./config.mjs";
 import { CodexGameStore } from "./codex-store.mjs";
 import { createImageGenerator } from "./image-generator.mjs";
@@ -138,7 +139,7 @@ export function createGameCommandHandler({
         });
         await interaction.editReply(
           reply(
-            `Added **${result.character.name.replace(/([*_~`\\])/g, "\\$1")}** to this server’s game.\n${result.url}\n${publishingMessage(result)}`,
+            `${result.pending ? "Queued generation for" : "Added"} **${result.character.name.replace(/([*_~`\\])/g, "\\$1")}**${result.pending ? ". It will join this town when generation finishes." : " to this server’s game."}\n${result.url}\n${result.pending ? "Keep the game open to see the new character arrive." : publishingMessage(result)}`,
           ),
         );
       } else throw new Error("Unknown /game command.");
@@ -158,11 +159,14 @@ export function createGameCommandHandler({
 export function configuredGameHandler(env = process.env) {
   const config = gameConfig(env);
   return createGameCommandHandler({
-    service: new GameService({
-      store: new CodexGameStore(config),
-      generate: createImageGenerator(config),
-      baseUrl: config.baseUrl,
-    }),
+    service:
+      env.MINT_STUDIO_INTERNAL_ORIGIN || env.MINT_STUDIO_ORIGIN
+        ? createStudioDiscordService(env)
+        : new GameService({
+            store: new CodexGameStore(config),
+            generate: createImageGenerator(config),
+            baseUrl: config.baseUrl,
+          }),
     allowedUserIds: config.allowedUserIds,
   });
 }

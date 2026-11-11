@@ -4,7 +4,9 @@
 
 A full-screen 2D browser game starring Mint and the whole cast. Open the game and start walking. The world fills the display; character selection, controls, and editing live in in-game overlays. This free-roam demo has no story or quests yet.
 
-Each Discord server can have its own empty town and cast. The `/game create` and `/game add` bot modules use the VPS Codex CLI and its saved ChatGPT login to generate characters from server nicknames, avatars, descriptions, and uploaded references. Codex commits each roster update and starts a production build through the connected GitHub and Vercel apps. See [bot integration and setup](docs/discord-games.md).
+Each Discord server can have its own empty town and cast. The `/game create` and `/game add` bot modules use the VPS Codex CLI and its saved ChatGPT login to generate characters from server nicknames, avatars, descriptions, and uploaded references. The shared Ubuntu character service saves rosters and generation history and serves updates to Vercel. See [bot integration and setup](docs/discord-games.md).
+
+Open **Characters → Add / edit character** to add yourself or regenerate an existing character from new details and an optional reference image. Each IP has three lifetime generation attempts across all towns. Preview a generation, choose the version to use, and restore older artwork through **Show character history**. See [character studio setup and storage](docs/character-studio.md).
 
 The engine is custom **React + TypeScript + SVG**, with a frame-based movement loop, collision checks, A\* pathfinding, and a character-follow camera. It does not use Phaser, Unity, or a third-party game engine.
 
@@ -51,7 +53,7 @@ npm run dev
 npm run build
 ```
 
-Vite uses port 5173. Vercel builds with `npm run build` and serves `dist/`, as configured in `vercel.json`. No environment variables are required for the game.
+Vite uses port 5173. Vercel builds with `npm run build` and serves `dist/`, as configured in `vercel.json`. The base game runs from static assets. Character generation uses the server-side studio settings.
 
 ```sh
 npm test          # Movement, camera, imports, and save migrations

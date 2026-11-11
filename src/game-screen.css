@@ -1289,3 +1289,326 @@ body {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+.studio-modal {
+  width: min(940px, 100%);
+}
+.studio-heading-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.studio-modes {
+  display: flex;
+  padding: 4px;
+  gap: 4px;
+  border-radius: 12px;
+  background: #e7e8df;
+}
+.studio-modes button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 10px 13px;
+  border: 0;
+  border-radius: 9px;
+  color: #52615a;
+  background: transparent;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.studio-modes button.selected {
+  background: #fffdf4;
+  color: #254e40;
+  box-shadow: 0 2px 6px #142f2310;
+}
+.studio-quota {
+  color: #426452;
+  font-size: 13px;
+  font-weight: 700;
+}
+.studio-allowance {
+  color: #6c756d;
+  font-size: 12px;
+  line-height: 1.6;
+  margin: 13px 0 23px;
+  max-width: 660px;
+}
+.studio-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  gap: 28px;
+}
+.studio-form fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 15px;
+  min-width: 0;
+}
+.studio-form .field {
+  margin: 0;
+}
+.studio-form .field input,
+.studio-form .field select,
+.studio-form .field textarea {
+  width: 100%;
+  border: 1px solid #d0d6cc;
+  border-radius: 9px;
+  background: #fffef8;
+  color: #253f35;
+  padding: 11px 12px;
+  font: inherit;
+  font-size: 14px;
+}
+.studio-form textarea {
+  resize: vertical;
+  min-height: 110px;
+  line-height: 1.6;
+}
+.studio-form input:focus-visible,
+.studio-form select:focus-visible,
+.studio-form textarea:focus-visible {
+  outline: 2px solid #649b79;
+  outline-offset: 2px;
+}
+.studio-checkbox {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  color: #4b6155;
+  font-size: 13px;
+  cursor: pointer;
+}
+.studio-checkbox input {
+  width: 17px;
+  height: 17px;
+  accent-color: #426a50;
+}
+.studio-upload {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 14px;
+  border: 1px dashed #9cae9b;
+  border-radius: 10px;
+  color: #44664d;
+  cursor: pointer;
+  overflow: hidden;
+}
+.studio-upload span {
+  font-size: 13px;
+  font-weight: 600;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.studio-upload small {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  font-weight: 400;
+  color: #788276;
+}
+.studio-upload input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+  width: 100%;
+}
+.studio-upload:focus-within {
+  outline: 2px solid #649b79;
+  outline-offset: 2px;
+}
+.studio-reference {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.studio-reference img {
+  width: 56px;
+  height: 56px;
+  border-radius: 8px;
+  object-fit: cover;
+}
+.studio-generate {
+  width: 100%;
+  justify-content: center;
+}
+.studio-modal button:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+.studio-preview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 13px;
+  min-width: 0;
+}
+.studio-character-stage {
+  width: 100%;
+  height: 300px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 16px;
+  color: #94ad98;
+  background:
+    radial-gradient(ellipse at 50% 90%, #d8e0cf, transparent 48%), #eaf0e5;
+  border: 1px solid #dce4d6;
+}
+.studio-character-stage > svg {
+  height: 92%;
+  width: 85%;
+  max-width: 100%;
+}
+.studio-preview > strong {
+  color: #2b4b39;
+  font:
+    600 21px Fredoka,
+    sans-serif;
+}
+.studio-preview .button {
+  width: 100%;
+  justify-content: center;
+}
+.studio-progress {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  color: #526d58;
+  font-size: 13px;
+}
+.studio-modal .text-button {
+  color: #42654e;
+  font-size: 13px;
+}
+.studio-message {
+  margin: 0;
+  font-size: 13px;
+  color: #396744;
+}
+.studio-error {
+  color: #9a3e34;
+  background: #f7e9e2;
+  border-radius: 8px;
+  padding: 12px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.studio-history {
+  border-top: 1px solid #d9dfd2;
+  margin-top: 25px;
+  padding-top: 22px;
+}
+.studio-history h3 {
+  margin: 0;
+  font:
+    600 20px Fredoka,
+    sans-serif;
+  color: #31523d;
+}
+.studio-history > p {
+  font-size: 12px;
+  color: #73806f;
+  line-height: 1.6;
+}
+.studio-history-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
+  gap: 12px;
+}
+.studio-history-grid > button {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid #d4ddce;
+  background: #fffdf5;
+  border-radius: 10px;
+  color: #3d5844;
+  cursor: pointer;
+  min-width: 0;
+}
+.studio-history-grid > button.selected {
+  border-color: #4b825b;
+  box-shadow: 0 0 0 1px #4b825b;
+}
+.studio-version-art {
+  width: 100%;
+  height: 150px;
+  display: grid;
+  place-items: center;
+  background: #edf1e5;
+  border-radius: 7px;
+}
+.studio-version-art > svg {
+  width: 100%;
+  height: 100%;
+}
+.studio-history-grid strong {
+  font-size: 11px;
+  line-height: 1.5;
+}
+.studio-history-grid p {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.studio-history-grid button > span:last-of-type:not(.studio-version-art) {
+  font-size: 10px;
+  color: #568160;
+}
+.studio-spinning {
+  animation: studio-spin 1.4s linear infinite;
+}
+@keyframes studio-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (max-width: 620px) {
+  .studio-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 22px;
+  }
+  .studio-preview {
+    order: -1;
+  }
+  .studio-character-stage {
+    height: 210px;
+  }
+  .studio-heading-row {
+    gap: 10px;
+  }
+  .studio-modes {
+    width: 100%;
+  }
+  .studio-modes button {
+    flex: 1;
+    font-size: 12px;
+    padding: 10px;
+  }
+  .studio-allowance {
+    margin-bottom: 16px;
+  }
+  .studio-history-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .studio-spinning {
+    animation: none;
+  }
+}

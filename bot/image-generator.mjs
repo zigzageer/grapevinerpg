@@ -72,6 +72,14 @@ export async function downloadReference(reference, request = globalThis.fetch) {
     await reader.cancel();
   }
   const bytes = Buffer.concat(chunks);
+  return validateReference(bytes, type);
+}
+
+export async function validateReference(bytes, type) {
+  if (!IMAGE_TYPES.has(type) || bytes.length > MAX_REFERENCE_BYTES)
+    throw new Error(
+      "Use a PNG, JPEG, or WebP reference image smaller than 10 MB.",
+    );
   const metadata = await sharp(bytes, {
     limitInputPixels: 25_000_000,
   }).metadata();
@@ -104,7 +112,11 @@ export function createImageGenerator({
 }) {
   return async ({ name, description, references }) => {
     const images = await Promise.all(
-      references.map((ref) => downloadReference(ref, request)),
+      references.map((ref) =>
+        ref.bytes
+          ? validateReference(ref.bytes, ref.type)
+          : downloadReference(ref, request),
+      ),
     );
     const directory = await mkdtemp(path.join(tmpdir(), "mint-game-"));
     const output = path.join(directory, "sprite.png");
@@ -133,7 +145,7 @@ export function createImageGenerator({
         ],
         promptForTask: () =>
           [
-            "Generate a sprite for an authorized Discord server game using your built-in image_gen__imagegen tool.",
+            "Generate a sprite for an authorized Adventures of Mint character using your built-in image_gen__imagegen tool.",
             characterPrompt({
               name,
               description,

@@ -341,7 +341,8 @@ export function normalizeCharacter(
           : fallback.glasses,
     sprite:
       typeof c.sprite === "string" &&
-      /^data:image\/(png|webp);base64,/.test(c.sprite) &&
+      (/^data:image\/(png|webp);base64,/.test(c.sprite) ||
+        /^\/api\/studio\/assets\/[a-f0-9-]{36}\.png$/.test(c.sprite)) &&
       c.sprite.length < 1_500_000
         ? c.sprite
         : undefined,

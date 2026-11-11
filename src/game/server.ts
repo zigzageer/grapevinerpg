@@ -42,12 +42,16 @@ export function parseServerGame(input: unknown, guildId: string): ServerGame {
     if (
       !raw ||
       typeof raw.id !== "string" ||
-      !/^discord-\d{17,20}$/.test(raw.id) ||
+      !/^(discord-\d{17,20}|web-[a-f0-9-]{36})$/.test(raw.id) ||
       typeof raw.name !== "string" ||
       !raw.name.trim() ||
       ids.has(raw.id) ||
       typeof raw.sprite !== "string" ||
-      raw.sprite !== `/games/${guildId}/${raw.id.slice(8)}.png`
+      (!/^\/api\/studio\/assets\/[a-f0-9-]{36}\.png$/.test(raw.sprite) &&
+        !(
+          raw.id.startsWith("discord-") &&
+          raw.sprite === `/games/${guildId}/${raw.id.slice(8)}.png`
+        ))
     )
       throw new Error("This server’s character data could not be read.");
     ids.add(raw.id);

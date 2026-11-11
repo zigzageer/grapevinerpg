@@ -13,12 +13,16 @@
     "bundle:demo": "npm run build && node scripts/bundle-demo.mjs",
     "test:bot": "node --test bot/*.test.mjs",
     "bot:start": "node --env-file-if-exists=.env bot/start.mjs",
-    "bot:register": "node --env-file-if-exists=.env scripts/register-game-command.mjs"
+    "bot:register": "node --env-file-if-exists=.env scripts/register-game-command.mjs",
+    "test:studio": "node --test server/*.test.mjs",
+    "studio:start": "node --env-file-if-exists=.env server/start.mjs",
+    "studio:seed": "node scripts/seed-studio.mjs"
   },
   "dependencies": {
     "@fontsource/dm-sans": "^5.2.8",
     "@fontsource/fredoka": "^5.2.8",
     "discord.js": "^14.28.1",
+    "jose": "^6.2.17",
     "lucide-react": "^0.577.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",

@@ -33,6 +33,15 @@ import { findPath } from "./game/navigation";
 import { Town } from "./components/Town";
 import { Portrait } from "./components/Character";
 import { Modal } from "./components/Modal";
+import { CharacterStudio } from "./components/CharacterStudio";
+import {
+  mergeStudioCrew,
+  readAppliedVersions,
+  rememberAppliedVersions,
+  studioAvailable,
+  studioRequest,
+  type StudioGame,
+} from "./game/studio";
 import { CrewEditor } from "./components/CrewEditor";
 import { TouchJoystick } from "./components/TouchJoystick";
 import { TownMap } from "./components/TownMap";
@@ -40,7 +49,7 @@ import { TOWN_NAME, districtAt } from "./game/locations";
 import { ServerLoader } from "./components/ServerLoader";
 import { loadServerSave, serverSaveKey, type ServerGame } from "./game/server";
 
-type Panel = "characters" | "crew" | "help" | "pause" | "map" | null;
+type Panel = "characters" | "crew" | "studio" | "help" | "pause" | "map" | null;
 function loadDemo(): SaveGame {
   const saved = loadSave();
   return {
@@ -73,6 +82,8 @@ function Game({ server }: { server?: ServerGame }) {
     [target, setTarget] = useState<Point | null>(null);
   const [panel, setPanel] = useState<Panel>(null),
     [search, setSearch] = useState("");
+  const sharedUpdatedAt = useRef(0);
+  const [studioCharacter, setStudioCharacter] = useState<string | undefined>();
   const [zoom, setZoom] = useState(DEFAULT_ZOOM),
     [toast, setToast] = useState(""),
     [saved, setSaved] = useState<"saved" | "saving" | "failed">("saved"),
@@ -145,6 +156,10 @@ function Game({ server }: { server?: ServerGame }) {
     [stop],
   );
   openRef.current = open;
+  const openStudio = (characterId?: string) => {
+    setStudioCharacter(characterId);
+    open("studio");
+  };
   const walkTo = (point: Point) => {
     const route = findPath(position.current, point);
     if (!route.length) {
@@ -178,6 +193,43 @@ function Game({ server }: { server?: ServerGame }) {
         : server.characters[0]?.id,
     }));
   }, [server]);
+  useEffect(() => {
+    if (server || !studioAvailable()) return;
+    const controller = new AbortController();
+    const refresh = async () => {
+      try {
+        const shared = await studioRequest<StudioGame>(
+          "/games/mint",
+          undefined,
+          controller.signal,
+        );
+        if (
+          controller.signal.aborted ||
+          Date.parse(shared.updatedAt) <= sharedUpdatedAt.current
+        )
+          return;
+        sharedUpdatedAt.current = Date.parse(shared.updatedAt);
+        const applied = readAppliedVersions();
+        setGame((current) => {
+          const crew = mergeStudioCrew(current.crew, shared, applied);
+          return crew === current.crew ? current : { ...current, crew };
+        });
+        rememberAppliedVersions(shared);
+      } catch {
+        /* The existing cast and browser saves remain playable during a connection failure. */
+      }
+    };
+    void refresh();
+    const interval = setInterval(() => {
+      if (!document.hidden) void refresh();
+    }, 15_000);
+    window.addEventListener("focus", refresh);
+    return () => {
+      controller.abort();
+      clearInterval(interval);
+      window.removeEventListener("focus", refresh);
+    };
+  }, [server?.guildId]);
   useEffect(() => {
     const measure = () => {
       const box = viewportRef.current?.getBoundingClientRect();
@@ -606,12 +658,17 @@ function Game({ server }: { server?: ServerGame }) {
             )}
           </div>
           <footer className="picker-footer">
+            {studioAvailable() && (
+              <button className="button primary" onClick={() => openStudio()}>
+                <Sparkles size={16} /> Add / edit character
+              </button>
+            )}
             {!server && (
               <button className="button secondary" onClick={() => open("crew")}>
                 <Pencil size={15} /> Character workshop
               </button>
             )}
-            {server && <span>Add friends from Discord with /game add.</span>}
+
             <span>Choose anyone. You’re back in the game.</span>
           </footer>
         </Modal>
@@ -645,6 +702,13 @@ function Game({ server }: { server?: ServerGame }) {
               <span>Choose character</span>
               <ChevronRight size={17} />
             </button>
+            {studioAvailable() && (
+              <button onClick={() => openStudio(activeKey)}>
+                <Sparkles size={19} />
+                <span>Add / edit character</span>
+                <ChevronRight size={17} />
+              </button>
+            )}
             {!server && (
               <button onClick={() => open("crew")}>
                 <Pencil size={19} />
@@ -698,6 +762,26 @@ function Game({ server }: { server?: ServerGame }) {
             />
           </label>
         </Modal>
+      )}
+      {panel === "studio" && (
+        <CharacterStudio
+          gameId={server?.guildId || "mint"}
+          initialCharacterId={studioCharacter}
+          onClose={() => setPanel(null)}
+          onPublished={(shared, characterId) => {
+            sharedUpdatedAt.current = Date.parse(shared.updatedAt);
+            const applied = readAppliedVersions();
+            delete applied[characterId];
+            setGame((current) => ({
+              ...current,
+              crew: server
+                ? shared.characters
+                : mergeStudioCrew(current.crew, shared, applied),
+            }));
+            if (!server) rememberAppliedVersions(shared);
+            notify("Character saved. Choose them from Characters.");
+          }}
+        />
       )}
       {panel === "crew" && (
         <CrewEditor
