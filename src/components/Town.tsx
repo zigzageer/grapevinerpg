@@ -420,7 +420,7 @@ export function Town({
       data-testid="town"
       className="town-svg"
       viewBox={`${camera.x} ${camera.y} ${camera.width} ${camera.height}`}
-      aria-label={`${townName} free-roam town. Click the ground to walk or a character to play as them.`}
+      aria-label={`${townName} free-roam town. Click the ground to walk or a character to interact with them.`}
       onPointerDown={(e) => {
         if (e.button !== 0) return;
         const matrix = e.currentTarget.getScreenCTM();
@@ -455,7 +455,7 @@ export function Town({
             key={e.key}
             role={active ? undefined : "button"}
             tabIndex={active ? undefined : 0}
-            aria-label={active ? undefined : `Play as ${e.c.name}`}
+            aria-label={active ? undefined : `Interact with ${e.c.name}`}
             className={active ? "active-citizen" : "world-citizen"}
             onPointerDown={(event) => event.stopPropagation()}
             onClick={(event) => {

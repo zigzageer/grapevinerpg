@@ -42,6 +42,206 @@ async function assertFullscreen(page: Page) {
   expect(size.scrollHeight).toBeCloseTo(size.height, 0);
 }
 
+async function perfectTiming(page: Page) {
+  await expect(page.locator(".battle-timing")).toBeVisible();
+  await page.clock.runFor(1260);
+  await page.keyboard.press("Space");
+  await expect(page.getByTestId("battle")).toHaveAttribute(
+    "data-phase",
+    "impact",
+  );
+}
+
+test("character interactions animate a kiss and preserve the player until Play as is chosen", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const sprite = page.getByTestId("player-sprite");
+  const x = await sprite.getAttribute("data-x");
+  await page
+    .getByRole("button", { name: "Interact with Sarina", exact: true })
+    .click();
+  await expect(
+    page.getByRole("dialog", { name: "Sarina", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Fight", exact: true }),
+  ).toBeVisible();
+  await page.keyboard.down("d");
+  await page.waitForTimeout(100);
+  await page.keyboard.up("d");
+  await page.getByRole("button", { name: "Kiss", exact: true }).click();
+  await expect(page.locator(".duo-kiss")).toBeVisible();
+  await expect(page.getByRole("status")).toHaveText(
+    "Mint gives Sarina a quick kiss.",
+  );
+  await page
+    .getByRole("button", { name: "Back to Sarina", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Play as Sarina", exact: true })
+    .click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(page.getByTestId("active-character-name")).toHaveText("Sarina");
+  await expect(sprite).toHaveAttribute("data-x", x!);
+});
+
+test("a complete duel supports timed attacks, blocks, snacks, status effects and returning to town", async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  const startTime = new Date("2026-11-11T12:00:00Z");
+  await page.clock.install({ time: startTime });
+  await page.goto("/");
+  await page.clock.pauseAt(new Date(startTime.getTime() + 60_000));
+  const position = await page
+    .getByTestId("player-sprite")
+    .getAttribute("data-x");
+  await page
+    .getByRole("button", { name: "Interact with Sarina", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Fight", exact: true }).click();
+  const battle = page.getByTestId("battle");
+  await expect(
+    page.getByRole("meter", { name: "Mint health", exact: true }),
+  ).toHaveAttribute("aria-valuenow", "100");
+  await page
+    .getByRole("button", { name: "Use Paper spark", exact: true })
+    .click();
+  await perfectTiming(page);
+  await expect(battle).toHaveAttribute("data-phase", "impact");
+  await expect(page.locator(".duo-stage")).toHaveAttribute(
+    "data-move",
+    "spark",
+  );
+  await expect(page.locator(".fighter-status.opponent")).toContainText(
+    "Burning",
+  );
+  await page.clock.runFor(850);
+  await perfectTiming(page);
+  await page.clock.runFor(850);
+  await expect(battle).toHaveAttribute("data-phase", "choose");
+  await page.getByRole("button", { name: "Eat a snack", exact: true }).click();
+  await expect(
+    page.getByRole("meter", { name: "Mint health", exact: true }),
+  ).toHaveAttribute("aria-valuenow", "100");
+  await expect(
+    page.getByRole("button", { name: "Eat a snack", exact: true }),
+  ).toBeDisabled();
+  await page
+    .getByRole("button", { name: "Use Heavy hit", exact: true })
+    .click();
+  await perfectTiming(page);
+  await page.clock.runFor(850);
+  await perfectTiming(page);
+  await page.clock.runFor(850);
+  await expect(battle).toHaveAttribute("data-phase", "choose");
+  await page
+    .getByRole("button", { name: "Use Heavy hit", exact: true })
+    .click();
+  await perfectTiming(page);
+  await page.clock.runFor(850);
+  await expect(battle).toHaveAttribute("data-phase", "victory");
+  await expect(page.getByText("Mint wins!", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Back to town", exact: true }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(page.getByTestId("player-sprite")).toHaveAttribute(
+    "data-x",
+    position!,
+  );
+  await page.keyboard.down("d");
+  await page.clock.runFor(100);
+  await page.keyboard.up("d");
+  expect(
+    Number(await page.getByTestId("player-sprite").getAttribute("data-x")),
+  ).toBeGreaterThan(Number(position));
+  expect(errors).toEqual([]);
+});
+
+test("leaving a duel cancels pending timing and restores normal controls", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page
+    .getByRole("button", { name: "Interact with Sarina", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Fight", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Use Ground stomp", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "Strike!", exact: true }),
+  ).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await page.waitForTimeout(2100);
+  await page.keyboard.press("c");
+  await expect(
+    page.getByRole("group", { name: "Character selection" }),
+  ).toBeVisible();
+});
+
+for (const viewport of [
+  { width: 390, height: 844 },
+  { width: 844, height: 390 },
+]) {
+  test(`touch duels and kiss controls fit ${viewport.width}x${viewport.height}`, async ({
+    browser,
+  }) => {
+    const context = await browser.newContext({
+      viewport,
+      isMobile: true,
+      hasTouch: true,
+    });
+    const page = await context.newPage();
+    try {
+      await page.goto("http://127.0.0.1:5173/");
+      await pause(page);
+      await page
+        .getByRole("slider", { name: "Camera zoom", exact: true })
+        .fill("1.5");
+      await page
+        .getByRole("button", { name: "Resume game", exact: true })
+        .tap();
+      await page
+        .getByRole("button", { name: "Interact with Sarina", exact: true })
+        .tap();
+      await page.getByRole("button", { name: "Fight", exact: true }).tap();
+      await page
+        .getByRole("button", { name: "Use Snowball", exact: true })
+        .tap();
+      const strike = page.getByRole("button", { name: "Strike!", exact: true });
+      await expect(strike).toBeVisible();
+      const bounds = (await strike.boundingBox())!;
+      expect(bounds.x).toBeGreaterThanOrEqual(0);
+      expect(bounds.x + bounds.width).toBeLessThanOrEqual(viewport.width);
+      expect(bounds.y).toBeGreaterThanOrEqual(0);
+      expect(bounds.y + bounds.height).toBeLessThanOrEqual(viewport.height);
+      await strike.tap();
+      await page
+        .getByRole("button", { name: "Leave fight", exact: true })
+        .tap();
+      await page
+        .getByRole("button", { name: "Interact with Sarina", exact: true })
+        .tap();
+      await page.getByRole("button", { name: "Kiss", exact: true }).tap();
+      await expect(page.locator(".duo-kiss")).toBeVisible();
+      expect(
+        await page.evaluate(() => document.documentElement.scrollWidth),
+      ).toBe(viewport.width);
+      await page
+        .getByRole("button", { name: "Close dialog", exact: true })
+        .tap();
+      await expect(
+        page.getByRole("group", { name: "Movement joystick" }),
+      ).toBeVisible();
+    } finally {
+      await context.close();
+    }
+  });
+}
+
 test("the game fills the screen immediately and every character can be played", async ({
   page,
 }) => {
@@ -82,6 +282,10 @@ test("clicking a citizen, following movement, and restoring the save all work", 
   await page.goto("/");
   await page
     .getByTestId("town")
+    .getByRole("button", { name: "Interact with Sarina", exact: true })
+    .click();
+  await page
+    .getByRole("dialog")
     .getByRole("button", { name: "Play as Sarina", exact: true })
     .click();
   await expect(page.getByTestId("active-character-name")).toHaveText("Sarina");

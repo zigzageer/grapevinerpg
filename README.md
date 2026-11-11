@@ -4,6 +4,8 @@
 
 A full-screen 2D browser game starring Mint and the whole cast. Open the game and start walking. The world fills the display; character selection, controls, and editing live in in-game overlays. This free-roam demo has no story or quests yet.
 
+Click a character in town to **Fight**, **Kiss**, or **Play as** them. Friendly one-on-one duels use timed hits and blocks, melee and ranged attacks, power points, armor, burning, stun, and two snacks per fight. Health and power refill each duel. Tap the timing button or press Space when the marker reaches the green zone, with perfect timing in its gold center. The combat is inspired by the mechanics described in [Prima’s Stick of Truth combat guide](https://primagames.com/eguides/south-park-the-stick-of-truth-eguide/how-not-to-get-screwed/how-not-to-get-screwed).
+
 Each Discord server can have its own empty town and cast. The `/game create` and `/game add` bot modules use the VPS Codex CLI and its saved ChatGPT login to generate characters from server nicknames, avatars, descriptions, and uploaded references. The bot publishes its roster and artwork through GitHub and Vercel. See [bot integration and setup](docs/discord-games.md).
 
 Open **Characters → Add / edit character** to add yourself or regenerate an existing character from new details and an optional reference image. Each IP has three lifetime generation attempts across all towns. Preview a generation, choose the version to use, and restore older artwork through **Show character history**. See [character studio setup and storage](docs/character-studio.md).

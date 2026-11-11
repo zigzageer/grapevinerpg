@@ -34,6 +34,7 @@ import { Town } from "./components/Town";
 import { Portrait } from "./components/Character";
 import { Modal } from "./components/Modal";
 import { CharacterStudio } from "./components/CharacterStudio";
+import { CharacterInteraction } from "./components/CharacterInteraction";
 import {
   mergeStudioCrew,
   readAppliedVersions,
@@ -49,7 +50,15 @@ import { TOWN_NAME, districtAt } from "./game/locations";
 import { ServerLoader } from "./components/ServerLoader";
 import { loadServerSave, serverSaveKey, type ServerGame } from "./game/server";
 
-type Panel = "characters" | "crew" | "studio" | "help" | "pause" | "map" | null;
+type Panel =
+  | "characters"
+  | "crew"
+  | "studio"
+  | "interact"
+  | "help"
+  | "pause"
+  | "map"
+  | null;
 function loadDemo(): SaveGame {
   const saved = loadSave();
   return {
@@ -84,6 +93,10 @@ function Game({ server }: { server?: ServerGame }) {
     [search, setSearch] = useState("");
   const sharedUpdatedAt = useRef(0);
   const [studioCharacter, setStudioCharacter] = useState<string | undefined>();
+  const [interaction, setInteraction] = useState<{
+    actor: Character;
+    other: Character;
+  } | null>(null);
   const [zoom, setZoom] = useState(DEFAULT_ZOOM),
     [toast, setToast] = useState(""),
     [saved, setSaved] = useState<"saved" | "saving" | "failed">("saved"),
@@ -482,7 +495,10 @@ function Game({ server }: { server?: ServerGame }) {
               onMove={(point) => {
                 if (!blocked.current) walkTo(point);
               }}
-              onSelect={select}
+              onSelect={(other) => {
+                setInteraction({ actor: active, other });
+                open("interact");
+              }}
             />
           </div>
           {tvLook && (
@@ -669,7 +685,7 @@ function Game({ server }: { server?: ServerGame }) {
               </button>
             )}
 
-            <span>Choose anyone. You’re back in the game.</span>
+            <span>Tap someone in town to fight or kiss.</span>
           </footer>
         </Modal>
       )}
@@ -780,6 +796,20 @@ function Game({ server }: { server?: ServerGame }) {
             }));
             if (!server) rememberAppliedVersions(shared);
             notify("Character saved. Choose them from Characters.");
+          }}
+        />
+      )}
+      {panel === "interact" && interaction && (
+        <CharacterInteraction
+          actor={interaction.actor}
+          other={interaction.other}
+          onClose={() => {
+            setPanel(null);
+            setInteraction(null);
+          }}
+          onPlay={(character) => {
+            choose(character);
+            setInteraction(null);
           }}
         />
       )}
