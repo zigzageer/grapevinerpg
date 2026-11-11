@@ -694,6 +694,88 @@ button:active:not(:disabled) {
   transform-origin: center 29%;
   animation: orrow-talk 1.04s step-end infinite;
 }
+.burger-eating {
+  transform-box: fill-box;
+  transform-origin: center bottom;
+  animation: burger-bite-nod 2.8s ease-in-out infinite;
+}
+.burger-chew-face,
+.burger-bite-crumbs {
+  opacity: 0;
+}
+.burger-chew-face {
+  animation: burger-chew-face 2.8s step-end infinite;
+}
+.burger-chew-mouth {
+  transform-box: fill-box;
+  transform-origin: 62% 12%;
+  animation: burger-chew-mouth 2.8s step-end infinite;
+}
+.burger-bite-crumbs {
+  animation: burger-bite-crumbs 2.8s ease-out infinite;
+}
+@keyframes burger-bite-nod {
+  0%,
+  13%,
+  54%,
+  100% {
+    transform: none;
+  }
+  20%,
+  31%,
+  42% {
+    transform: rotate(1.4deg) scaleY(0.985);
+  }
+  25%,
+  36%,
+  47% {
+    transform: rotate(0.4deg);
+  }
+}
+@keyframes burger-chew-face {
+  0%,
+  54%,
+  100% {
+    opacity: 0;
+  }
+  18% {
+    opacity: 1;
+  }
+}
+@keyframes burger-chew-mouth {
+  0%,
+  54%,
+  100% {
+    transform: none;
+  }
+  18%,
+  29%,
+  40%,
+  51% {
+    transform: scale(0.94, 0.16);
+  }
+  23%,
+  34%,
+  45% {
+    transform: scale(0.97, 0.48);
+  }
+}
+@keyframes burger-bite-crumbs {
+  0%,
+  17% {
+    opacity: 0;
+    transform: none;
+  }
+  20% {
+    opacity: 1;
+    transform: translate(-3px, -2px);
+  }
+  35%,
+  100% {
+    opacity: 0;
+    transform: translate(-15px, 8px);
+  }
+}
 .chair-roll-streaks {
   opacity: 0.72;
 }

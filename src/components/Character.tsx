@@ -44,6 +44,38 @@ function OrrowMouth() {
   );
 }
 
+function BurgerBite() {
+  return (
+    <g aria-hidden="true">
+      {/* Match the visible mouth in the cutout so the bun stays in front of it. */}
+      <g className="burger-chew-face">
+        <path
+          d="M69.4 50.2Q76.6 50.9 84.9 50.1L85 54.1Q76.1 58.5 74.2 66.7Q69.7 69.1 66.7 65.9Q63.5 61.4 66.5 54.6Z"
+          fill="#70432e"
+        />
+        <g className="burger-chew-mouth">
+          <path
+            d="M69.5 50.8Q76.1 51.5 84.5 50.8L84.6 53.7Q76.6 57.3 74.1 66.6Q69.2 68 66.9 65Q64.4 60.5 67 54.9Z"
+            fill="#321f22"
+          />
+          <path
+            d="M69.7 51.3Q76.2 51.8 83.9 51.3Q83.7 53.4 80.2 53.5H73.1Q69.9 53.2 69.7 51.3Z"
+            fill="#ece7eb"
+          />
+          <path
+            d="M66.7 60.5Q70.9 57.1 76.2 61.1L74 66.1Q69 67.9 67.4 64.6Z"
+            fill="#c16d79"
+          />
+        </g>
+      </g>
+      <g className="burger-bite-crumbs">
+        <path d="M69 59l3 1-2 2-2-1zM62 62l2-1 1 2-2 1z" fill="#eab45b" />
+        <path d="M66 55l2 1-1 2-2-1z" fill="#f3cf82" />
+      </g>
+    </g>
+  );
+}
+
 function ChairRoll({ facing }: { facing: number }) {
   return (
     <>
@@ -97,17 +129,28 @@ function CharacterCutout({
   const sprite = c.sprite || (c.preset ? characterArtUrl(c.preset) : undefined);
   if (sprite) {
     const rolling = moving && !c.sprite && c.preset === "kawaiikitty";
+    const eating = !c.sprite && c.preset === "steakbutterfan";
     const motion = rolling ? " chair-rolling" : moving ? " walking" : "";
+    const image = (
+      <image
+        href={sprite}
+        x="0"
+        y={c.preset === "zippy" ? 30 : 0}
+        width="150"
+        height={c.preset === "zippy" ? 150 : 180}
+        preserveAspectRatio="xMidYMax meet"
+      />
+    );
     return (
       <g className={`paper-person${motion}`}>
-        <image
-          href={sprite}
-          x="0"
-          y={c.preset === "zippy" ? 30 : 0}
-          width="150"
-          height={c.preset === "zippy" ? 150 : 180}
-          preserveAspectRatio="xMidYMax meet"
-        />
+        {eating ? (
+          <g className="burger-eating">
+            {image}
+            <BurgerBite />
+          </g>
+        ) : (
+          image
+        )}
         {!c.sprite && c.preset === "orrow" && <OrrowMouth />}
         {rolling && <ChairRoll facing={facing} />}
       </g>

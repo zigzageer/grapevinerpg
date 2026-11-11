@@ -487,6 +487,42 @@ test("Orrow chatters at rest and kawaiikitty rolls without a walking hop", async
   await expect(sprite.locator(".chair-rolling")).toHaveCount(0);
 });
 
+test("steakbutterfan keeps chewing in town and fights", async ({ page }) => {
+  await page.goto("/");
+  await page
+    .getByRole("button", { name: "Play as steakbutterfan", exact: true })
+    .click();
+  const mouth = page.getByTestId("player-sprite").locator(".burger-chew-mouth");
+  await expect(mouth).toHaveCSS("animation-iteration-count", "infinite");
+  const [closed, open] = await mouth.evaluate((element) => {
+    const [chew] = element.getAnimations();
+    chew.pause();
+    chew.currentTime = 560;
+    const closed = getComputedStyle(element).transform;
+    chew.currentTime = 710;
+    const open = getComputedStyle(element).transform;
+    chew.play();
+    return [closed, open];
+  });
+  expect(closed).not.toBe(open);
+
+  await page
+    .getByRole("button", { name: "Interact with Sarina", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Fight", exact: true }).click();
+  const fighter = page.getByTestId("battle").locator(".duo-fighter.player");
+  await expect(fighter.locator(".burger-bite-crumbs")).toHaveCSS(
+    "animation-name",
+    "burger-bite-crumbs",
+  );
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await expect(fighter.locator(".burger-chew-mouth")).toHaveCSS(
+    "animation-name",
+    "none",
+  );
+  await expect(fighter.locator(".burger-chew-face")).toHaveCSS("opacity", "0");
+});
+
 test("clicking a citizen, following movement, and restoring the save all work", async ({
   page,
 }) => {
