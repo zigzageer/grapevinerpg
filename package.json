@@ -10,14 +10,19 @@
     "test": "vitest run",
     "test:e2e": "npm run bundle:demo && playwright test",
     "format": "prettier --write .",
-    "bundle:demo": "npm run build && node scripts/bundle-demo.mjs"
+    "bundle:demo": "npm run build && node scripts/bundle-demo.mjs",
+    "test:bot": "node --test bot/*.test.mjs",
+    "bot:start": "node --env-file-if-exists=.env bot/start.mjs",
+    "bot:register": "node --env-file-if-exists=.env scripts/register-game-command.mjs"
   },
   "dependencies": {
     "@fontsource/dm-sans": "^5.2.8",
     "@fontsource/fredoka": "^5.2.8",
+    "discord.js": "^14.28.1",
     "lucide-react": "^0.577.0",
     "react": "^19.3.1",
-    "react-dom": "^19.3.1"
+    "react-dom": "^19.3.1",
+    "sharp": "^0.35.5"
   },
   "devDependencies": {
     "@playwright/test": "^1.65.0",

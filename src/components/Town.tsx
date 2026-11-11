@@ -60,7 +60,7 @@ function Sign({ x, y, name }: Point & { name: string }) {
     </g>
   );
 }
-const Scenery = memo(function Scenery() {
+const Scenery = memo(function Scenery({ townName }: { townName: string }) {
   return (
     <g className="scenery" aria-hidden="true">
       <rect width={WORLD.width} height={WORLD.height} fill="#eef3f3" />
@@ -340,7 +340,7 @@ const Scenery = memo(function Scenery() {
           fontWeight="700"
           fill="#fff1d2"
         >
-          {TOWN_NAME.toUpperCase()}
+          {townName.toUpperCase()}
         </text>
         <path d="M-96-92H96" stroke="#fff" strokeWidth="8" />
       </g>
@@ -366,6 +366,7 @@ interface Props {
   target: Point | null;
   onMove: (point: Point) => void;
   onSelect: (character: Character) => void;
+  townName?: string;
 }
 const CITIZEN_SPOTS: Point[] = [
   { x: 225, y: 552 },
@@ -403,6 +404,7 @@ export function Town({
   target,
   onMove,
   onSelect,
+  townName = TOWN_NAME,
 }: Props) {
   const entities = crew
     .map((c, i) => ({
@@ -418,7 +420,7 @@ export function Town({
       data-testid="town"
       className="town-svg"
       viewBox={`${camera.x} ${camera.y} ${camera.width} ${camera.height}`}
-      aria-label={`${TOWN_NAME} free-roam town. Click the ground to walk or a character to play as them.`}
+      aria-label={`${townName} free-roam town. Click the ground to walk or a character to play as them.`}
       onPointerDown={(e) => {
         if (e.button !== 0) return;
         const matrix = e.currentTarget.getScreenCTM();
@@ -429,7 +431,7 @@ export function Town({
         onMove({ x: p.x, y: p.y });
       }}
     >
-      <Scenery />
+      <Scenery townName={townName} />
       {target && (
         <g
           className="walk-target"

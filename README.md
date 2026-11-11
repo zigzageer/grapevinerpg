@@ -4,6 +4,8 @@
 
 A full-screen 2D browser game starring Mint and the whole cast. Open the game and start walking. The world fills the display; character selection, controls, and editing live in in-game overlays. This free-roam demo has no story or quests yet.
 
+**Discord server games:** the engine also supports a separate empty town and cast for each Discord server. The `/game create` and `/game add` bot modules generate characters from server nicknames, avatars, descriptions, and uploaded references, then commit each roster update for Vercel to publish. See [bot integration and setup](docs/discord-games.md). Bot activation requires connecting these modules to the existing Discord bot and configuring its host credentials.
+
 The engine is custom **React + TypeScript + SVG**, with a frame-based movement loop, collision checks, A\* pathfinding, and a character-follow camera. It does not use Phaser, Unity, or a third-party game engine.
 
 The snowy town now uses AI-generated facades based on official South Park visual references: **Tweek Bros. Coffee, City Wok, Tom’s Rhinoplasty, South Park Elementary, Park County Police Station, and the Cartman, Marsh, Broflovski, and McCormick houses**, plus the bus stop. Downtown, the school/civic block, and the neighborhood connect through walkable streets. This is a playable arrangement of recognizable locations, not an exact canonical street map. See [reference and artwork notes](docs/town-reference.md).

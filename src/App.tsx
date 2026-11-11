@@ -37,6 +37,8 @@ import { CrewEditor } from "./components/CrewEditor";
 import { TouchJoystick } from "./components/TouchJoystick";
 import { TownMap } from "./components/TownMap";
 import { TOWN_NAME, districtAt } from "./game/locations";
+import { ServerLoader } from "./components/ServerLoader";
+import { loadServerSave, serverSaveKey, type ServerGame } from "./game/server";
 
 type Panel = "characters" | "crew" | "help" | "pause" | "map" | null;
 function loadDemo(): SaveGame {
@@ -51,7 +53,20 @@ function loadDemo(): SaveGame {
 }
 
 export default function App() {
-  const [game, setGame] = useState(loadDemo),
+  return (
+    <ServerLoader>
+      {(server) => <Game key={server?.guildId || "mint"} server={server} />}
+    </ServerLoader>
+  );
+}
+
+function Game({ server }: { server?: ServerGame }) {
+  const saveKey = server ? serverSaveKey(server.guildId) : SAVE_KEY;
+  const title = server?.name || "Adventures of Mint";
+  const townName = server?.name || TOWN_NAME;
+  const [game, setGame] = useState(() =>
+      server ? loadServerSave(server) : loadDemo(),
+    ),
     [player, setPlayer] = useState<Point>(game.player);
   const [moving, setMoving] = useState(false),
     [facing, setFacing] = useState(1),
@@ -153,6 +168,16 @@ export default function App() {
     setZoom(DEFAULT_ZOOM);
     setPanel(null);
   };
+  useEffect(() => {
+    if (!server) return;
+    setGame((g) => ({
+      ...g,
+      crew: server.characters,
+      activeCharacter: server.characters.some((c) => c.id === g.activeCharacter)
+        ? g.activeCharacter
+        : server.characters[0]?.id,
+    }));
+  }, [server]);
   useEffect(() => {
     const measure = () => {
       const box = viewportRef.current?.getBoundingClientRect();
@@ -329,7 +354,7 @@ export default function App() {
     const timeout = setTimeout(() => {
       try {
         localStorage.setItem(
-          SAVE_KEY,
+          saveKey,
           JSON.stringify({ ...game, player, activeCharacter: activeKey }),
         );
         setSaved("saved");
@@ -338,12 +363,12 @@ export default function App() {
       }
     }, 350);
     return () => clearTimeout(timeout);
-  }, [game, player, activeKey]);
+  }, [game, player, activeKey, saveKey]);
   useEffect(() => {
     const save = () => {
       try {
         localStorage.setItem(
-          SAVE_KEY,
+          saveKey,
           JSON.stringify({ ...state.current, player: position.current }),
         );
       } catch {
@@ -360,7 +385,7 @@ export default function App() {
       document.removeEventListener("visibilitychange", hidden);
       clearTimeout(timer.current);
     };
-  }, []);
+  }, [saveKey]);
   const canFullscreen =
     typeof document.documentElement.requestFullscreen === "function" &&
     document.fullscreenEnabled;
@@ -384,7 +409,7 @@ export default function App() {
       ref={sceneRef}
       className="play-screen"
       data-tv-look={tvLook}
-      aria-label="Adventures of Mint game"
+      aria-label={`${title} game`}
     >
       <div className="game-content" inert={!!panel} aria-hidden={!!panel}>
         <div
@@ -401,6 +426,7 @@ export default function App() {
               crew={game.crew}
               activeKey={activeKey}
               target={target}
+              townName={townName}
               onMove={(point) => {
                 if (!blocked.current) walkTo(point);
               }}
@@ -426,12 +452,12 @@ export default function App() {
                 <Portrait c={active} />
               </span>
               <span className="hud-player-info">
-                <span className="hud-caption">ADVENTURES OF MINT</span>
+                <span className="hud-caption">{title.toUpperCase()}</span>
                 <strong data-testid="active-character-name" aria-live="polite">
                   {active.name}
                 </strong>
                 <span className="hud-player-place">
-                  <MapPin size={10} /> {TOWN_NAME}
+                  <MapPin size={10} /> {townName}
                 </span>
               </span>
               <span
@@ -475,7 +501,7 @@ export default function App() {
             </div>
           </header>
           <div className="hud-location">
-            <span>{TOWN_NAME.toUpperCase()} · FREE ROAM</span>
+            <span>{townName.toUpperCase()} · FREE ROAM</span>
             <strong>{districtAt(player)}</strong>
             <span className="location-rule" />
           </div>
@@ -580,9 +606,12 @@ export default function App() {
             )}
           </div>
           <footer className="picker-footer">
-            <button className="button secondary" onClick={() => open("crew")}>
-              <Pencil size={15} /> Character workshop
-            </button>
+            {!server && (
+              <button className="button secondary" onClick={() => open("crew")}>
+                <Pencil size={15} /> Character workshop
+              </button>
+            )}
+            {server && <span>Add friends from Discord with /game add.</span>}
             <span>Choose anyone. You’re back in the game.</span>
           </footer>
         </Modal>
@@ -590,6 +619,7 @@ export default function App() {
       {panel === "map" && (
         <TownMap
           player={player}
+          townName={townName}
           onClose={() => setPanel(null)}
           onWalk={(point) => {
             setPanel(null);
@@ -600,7 +630,7 @@ export default function App() {
       {panel === "pause" && (
         <Modal
           title="Take a breather."
-          eyebrow="ADVENTURES OF MINT"
+          eyebrow={title.toUpperCase()}
           className="game-modal pause-modal"
           onClose={() => setPanel(null)}
         >
@@ -615,11 +645,13 @@ export default function App() {
               <span>Choose character</span>
               <ChevronRight size={17} />
             </button>
-            <button onClick={() => open("crew")}>
-              <Pencil size={19} />
-              <span>Character workshop</span>
-              <ChevronRight size={17} />
-            </button>
+            {!server && (
+              <button onClick={() => open("crew")}>
+                <Pencil size={19} />
+                <span>Character workshop</span>
+                <ChevronRight size={17} />
+              </button>
+            )}
             <button onClick={() => open("map")}>
               <Map size={20} />
               <span>Town map</span>

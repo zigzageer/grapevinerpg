@@ -7,14 +7,16 @@ export function TownMap({
   player,
   onWalk,
   onClose,
+  townName = TOWN_NAME,
 }: {
   player: Point;
   onWalk: (point: Point) => void;
   onClose: () => void;
+  townName?: string;
 }) {
   return (
     <Modal
-      title={TOWN_NAME}
+      title={townName}
       eyebrow="TOWN MAP"
       className="game-modal town-map-modal"
       onClose={onClose}
