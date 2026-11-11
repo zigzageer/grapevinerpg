@@ -47,6 +47,46 @@ async function perfectTiming(page: Page) {
   );
 }
 
+test("residents talk and roam while street traffic and the winter parade pass through town", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  const start = new Date("2026-11-11T12:00:00Z");
+  await page.clock.install({ time: start });
+  await page.clock.pauseAt(new Date(start.getTime() + 1000));
+  await page.goto("/");
+  await startAsMint(page);
+
+  const cartman = page.getByRole("button", { name: "Talk to Eric Cartman" });
+  const parked = await cartman.getAttribute("transform");
+  await cartman.click();
+  const dialogue = page.getByRole("dialog", { name: "Eric Cartman" });
+  await expect(dialogue).toContainText("Checking the City Wok menu");
+  await expect(dialogue).toContainText("I'm waiting for my order.");
+  await dialogue.getByRole("button", { name: "Back to town" }).click();
+
+  await page.clock.runFor(3000);
+  await expect(cartman).not.toHaveAttribute("transform", parked!);
+
+  const vehicleTransforms = () =>
+    page.locator("[data-vehicle]").evaluateAll((vehicles) =>
+      vehicles.map((vehicle) => vehicle.getAttribute("transform")),
+    );
+  await pause(page);
+  const stoppedTraffic = await vehicleTransforms();
+  expect(stoppedTraffic.length).toBeGreaterThan(0);
+  await page.clock.runFor(3000);
+  expect(await vehicleTransforms()).toEqual(stoppedTraffic);
+  await page.getByRole("button", { name: "Resume game" }).click();
+  await page.clock.runFor(16_000);
+  await expect(page.locator('[data-vehicle="float"]')).toBeVisible();
+  await expect(page.locator("[data-parade]").getByText("WINTER PARADE")).toBeVisible();
+  await page.clock.runFor(27_000);
+  await expect(page.locator("[data-parade]")).toHaveCount(0);
+  expect(await vehicleTransforms()).not.toEqual(stoppedTraffic);
+  await expect(page.getByTestId("active-character-name")).toHaveText("Mint");
+});
+
 test("character interactions animate a kiss and preserve the player until Play as is chosen", async ({
   page,
 }) => {
@@ -533,13 +573,7 @@ test("pause settings control the TV treatment and camera without leaking input",
     .toBeLessThan(before);
   await page.getByRole("button", { name: "Resume game", exact: true }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
-  await expect
-    .poll(() =>
-      page
-        .locator(".world-layer")
-        .evaluate((el) => getComputedStyle(el).filter),
-    )
-    .toBe("none");
+  await expect(page.locator(".world-layer")).toHaveCSS("filter", "none");
   await page.waitForTimeout(500);
   await page.reload();
   await expect(page.locator(".play-screen")).toHaveAttribute(

@@ -35,6 +35,8 @@ import {
 import { DEFAULT_ZOOM, MIN_ZOOM, MAX_ZOOM, followCamera } from "./game/camera";
 import { findPath } from "./game/navigation";
 import { Town } from "./components/Town";
+import { ResidentDialogue } from "./components/TownLife";
+import type { ResidentConversation } from "./game/town-life";
 import { Portrait } from "./components/Character";
 import { Modal } from "./components/Modal";
 import { CharacterStudio } from "./components/CharacterStudio";
@@ -59,6 +61,7 @@ type Panel =
   | "crew"
   | "studio"
   | "interact"
+  | "talk"
   | "help"
   | "pause"
   | "map"
@@ -103,6 +106,8 @@ function Game({ server }: { server?: ServerGame }) {
     actor: Character;
     other: Character;
   } | null>(null);
+  const [conversation, setConversation] =
+    useState<ResidentConversation | null>(null);
   const [zoom, setZoom] = useState(DEFAULT_ZOOM),
     [toast, setToast] = useState(""),
     [saved, setSaved] = useState<"saved" | "failed">("saved"),
@@ -524,6 +529,15 @@ function Game({ server }: { server?: ServerGame }) {
               activeKey={activeKey}
               target={target}
               townName={townName}
+              paused={!!panel}
+              onTalk={
+                server
+                  ? undefined
+                  : (dialogue) => {
+                      setConversation(dialogue);
+                      open("talk");
+                    }
+              }
               onMove={(point) => {
                 if (!blocked.current) walkTo(point);
               }}
@@ -857,6 +871,15 @@ function Game({ server }: { server?: ServerGame }) {
           }}
         />
       )}
+      {panel === "talk" && conversation && (
+        <ResidentDialogue
+          conversation={conversation}
+          onClose={() => {
+            setPanel(null);
+            setConversation(null);
+          }}
+        />
+      )}
       {panel === "crew" && (
         <CrewEditor
           crew={game.crew}
@@ -896,7 +919,8 @@ function Game({ server }: { server?: ServerGame }) {
               <Compass size={21} />
               <span>
                 <strong>Mouse & touch</strong>Click or tap the ground to walk
-                there. Tap someone in town to play as them.
+                there. Tap a cast member for actions
+                {server ? "." : ", or a resident to talk."}
               </span>
             </p>
             <p>
