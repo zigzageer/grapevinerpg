@@ -15,6 +15,7 @@ export interface Character {
   hat: Hat;
   hatColor: string;
   glasses: boolean;
+  heightScale?: number;
   sprite?: string;
   preset?:
     | "baguette-guy"
@@ -29,11 +30,13 @@ export interface Character {
     | "samira"
     | "genesis"
     | "kain"
-    | "footjobofsteel";
+    | "footjobofsteel"
+    | "steakbutterfan"
+    | "blindian";
 }
 export interface SaveGame {
   version: 1;
-  castVersion: 7;
+  castVersion: 8;
   activeCharacter?: string;
   tvLook?: boolean;
   player: Point;
@@ -230,7 +233,40 @@ export const DEMO_ADDITIONS: Character[] = [
     glasses: false,
   },
 ];
+export const CAST_ADDITIONS: Character[] = [
+  {
+    id: "cast-steakbutterfan",
+    name: "steakbutterfan",
+    kind: "human",
+    preset: "steakbutterfan",
+    skin: "#754d36",
+    hair: "bald",
+    hairColor: "#251f1b",
+    shirt: "#f4f1ee",
+    pants: "#36313b",
+    hat: "none",
+    hatColor: "#71436f",
+    glasses: false,
+  },
+  {
+    id: "cast-blindian",
+    name: "blindian",
+    kind: "human",
+    preset: "blindian",
+    heightScale: 1.45,
+    skin: "#9b6945",
+    hair: "short",
+    hairColor: "#242127",
+    shirt: "#e4d2ac",
+    pants: "#363139",
+    hat: "none",
+    hatColor: "#363139",
+    glasses: false,
+  },
+];
 export const characterKey = (c: Character) => c.id;
+export const characterScale = (c: Character) =>
+  c.heightScale ?? (c.preset === "blindian" ? 1.45 : 1);
 export const DEFAULT_CREW: Character[] = [
   {
     id: "you",
@@ -275,10 +311,11 @@ export const DEFAULT_CREW: Character[] = [
   GHOST,
   ...LATEST_CAST,
   ...DEMO_ADDITIONS,
+  ...CAST_ADDITIONS,
 ];
 export const initialSave = (): SaveGame => ({
   version: 1,
-  castVersion: 7,
+  castVersion: 8,
   activeCharacter: "you",
   tvLook: true,
   player: { ...START },
@@ -314,7 +351,9 @@ export function normalizeCharacter(
       c.preset === "samira" ||
       c.preset === "genesis" ||
       c.preset === "kain" ||
-      c.preset === "footjobofsteel"
+      c.preset === "footjobofsteel" ||
+      c.preset === "steakbutterfan" ||
+      c.preset === "blindian"
         ? c.preset
         : undefined,
     kind: c.kind === "mint" || c.kind === "human" ? c.kind : fallback.kind,
@@ -339,6 +378,10 @@ export function normalizeCharacter(
         : typeof c.glasses === "string"
           ? c.glasses !== "none"
           : fallback.glasses,
+    heightScale:
+      typeof c.heightScale === "number" && Number.isFinite(c.heightScale)
+        ? Math.max(0.75, Math.min(1.6, c.heightScale))
+        : fallback.heightScale,
     sprite:
       typeof c.sprite === "string" &&
       (/^data:image\/(png|webp);base64,/.test(c.sprite) ||
@@ -479,6 +522,20 @@ export function loadSave(): SaveGame {
           crew.push({ ...character, id: `friend-${crew.length}` });
       }
     }
+    if ((raw.castVersion ?? 0) < 8) {
+      for (const character of CAST_ADDITIONS) {
+        if (
+          crew.length >= 24 ||
+          crew.some((c) => c.preset === character.preset)
+        )
+          continue;
+        let id = character.id;
+        let suffix = 1;
+        while (crew.some((c) => c.id === id))
+          id = `${character.id}-${suffix++}`;
+        crew.push({ ...character, id });
+      }
+    }
     const player =
       raw.player &&
       Number.isFinite(raw.player.x) &&
@@ -488,7 +545,7 @@ export function loadSave(): SaveGame {
         : { ...START };
     return {
       version: 1,
-      castVersion: 7,
+      castVersion: 8,
       tvLook: raw.tvLook !== false,
       activeCharacter:
         typeof raw.activeCharacter === "string" &&

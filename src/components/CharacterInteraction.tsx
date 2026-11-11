@@ -13,6 +13,7 @@ import {
   Zap,
 } from "lucide-react";
 import type { Character } from "../game/model";
+import { characterScale } from "../game/model";
 import {
   battleReducer,
   createBattle,
@@ -51,6 +52,8 @@ function DuoStage({
   eventId?: number;
   kissing?: boolean;
 }) {
+  const scale = Math.max(1, characterScale(actor), characterScale(other));
+  const halfWidth = Math.max(117, 75 * scale + 8);
   const selfEffect = event && ["snack", "burn"].includes(event.move);
   const receivingSide = selfEffect
     ? event.actor
@@ -80,7 +83,10 @@ function DuoStage({
           >
             <span className="duo-shadow" />
             <div className="duo-motion">
-              <svg viewBox="-42 -12 234 204" aria-label={character.name}>
+              <svg
+                viewBox={`${75 - halfWidth} ${180 - 192 * scale} ${halfWidth * 2} ${204 * scale}`}
+                aria-label={character.name}
+              >
                 <CharacterArt c={character} facing={index ? -1 : 1} />
               </svg>
             </div>

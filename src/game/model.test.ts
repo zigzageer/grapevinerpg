@@ -7,6 +7,8 @@ import {
   movePlayer,
   movePlayerInSteps,
   normalizeCharacter,
+  characterScale,
+  CAST_ADDITIONS,
   parseCrew,
   START,
 } from "./model";
@@ -131,16 +133,18 @@ describe("cast updates and saved characters", () => {
         "genesis",
         "kain",
         "footjobofsteel",
+        "steakbutterfan",
+        "blindian",
       ]);
       expect(migrated.crew[1].name).toBe("Sam");
       expect(migrated).toMatchObject({
         greeted: true,
         inspected: true,
         player: { x: 720, y: 560 },
-        castVersion: 7,
+        castVersion: 8,
       });
       data = JSON.stringify(migrated);
-      expect(loadSave().crew).toHaveLength(16);
+      expect(loadSave().crew).toHaveLength(18);
       // Replacing the imported cast intentionally must not re-add removed characters on every reload.
       data = JSON.stringify({ ...migrated, crew: migrated.crew.slice(0, 3) });
       expect(loadSave().crew).toHaveLength(3);
@@ -161,7 +165,7 @@ describe("cast updates and saved characters", () => {
     });
     try {
       const migrated = loadSave();
-      expect(migrated.crew).toHaveLength(16);
+      expect(migrated.crew).toHaveLength(18);
       expect(migrated.crew[3]).toMatchObject({
         name: "Sammy",
         preset: "baguette-guy",
@@ -211,4 +215,62 @@ it("moves an old save out of a new building while retaining the cast and TV sett
   } finally {
     vi.unstubAllGlobals();
   }
+});
+
+it("adds the new cast once while preserving customized characters and unique IDs", () => {
+  let data = JSON.stringify({
+    ...initialSave(),
+    castVersion: 7,
+    activeCharacter: "cast-steakbutterfan",
+    crew: [
+      ...DEFAULT_CREW.slice(0, 3),
+      ...Array.from({ length: 13 }, (_, index) => ({
+        ...DEFAULT_CREW[3],
+        id: `cast-steakbutterfan${"-copy".repeat(index)}`,
+        name: index === 0 ? "My custom friend" : `Custom ${index}`,
+        preset: undefined,
+      })),
+    ],
+    player: { x: 720, y: 560 },
+  });
+  vi.stubGlobal("localStorage", { getItem: () => data });
+  try {
+    const migrated = loadSave();
+    expect(
+      migrated.crew.find((c) => c.id === "cast-steakbutterfan")?.name,
+    ).toBe("My custom friend");
+    expect(migrated.activeCharacter).toBe("cast-steakbutterfan");
+    expect(migrated.player).toEqual({ x: 720, y: 560 });
+    expect(new Set(migrated.crew.map((c) => c.id)).size).toBe(
+      migrated.crew.length,
+    );
+    expect(migrated.crew.every((c) => c.id.length <= 80)).toBe(true);
+    expect(
+      migrated.crew.filter((c) => c.preset === "steakbutterfan"),
+    ).toHaveLength(1);
+    expect(migrated.crew.filter((c) => c.preset === "blindian")).toHaveLength(
+      1,
+    );
+    data = JSON.stringify(migrated);
+    expect(loadSave().crew).toHaveLength(migrated.crew.length);
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+
+it("preserves tall stature through sprite changes and bounds imported scales", () => {
+  const blindian = CAST_ADDITIONS.find((c) => c.preset === "blindian")!;
+  expect(characterScale(normalizeCharacter(blindian))).toBe(1.45);
+  expect(
+    characterScale(
+      normalizeCharacter({
+        ...blindian,
+        preset: undefined,
+        sprite: "data:image/png;base64,AAAA",
+      }),
+    ),
+  ).toBe(1.45);
+  expect(normalizeCharacter({ heightScale: 500 }).heightScale).toBe(1.6);
+  expect(normalizeCharacter({ heightScale: -2 }).heightScale).toBe(0.75);
+  expect(characterScale(normalizeCharacter({ heightScale: Infinity }))).toBe(1);
 });

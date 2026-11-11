@@ -57,24 +57,27 @@ export class StudioStore {
     this.quotaSalt = this.db
       .prepare("SELECT value FROM settings WHERE key='quota_salt'")
       .get().value;
-    if (seed && !this.read("mint")) {
-      this.update("mint", () => ({
-        version: 1,
-        guildId: "mint",
-        slug: "",
-        name: "Adventures of Mint",
-        updatedAt: now(),
-        characters: seed.characters,
-      }));
-      for (const character of seed.characters) {
-        const row = this.character("mint", character.id);
-        this.db
-          .prepare("UPDATE versions SET description=? WHERE id=?")
-          .run(
-            seed.descriptions?.[character.preset] || "",
-            row.current_version,
-          );
-      }
+    if (seed) {
+      this.update(
+        "mint",
+        (game) => {
+          const additions = seed.characters
+            .filter((character) => !this.character("mint", character.id))
+            .slice(0, Math.max(0, 24 - (game?.characters.length || 0)));
+          if (game && !additions.length) return game;
+          return {
+            ...(game || {
+              version: 1,
+              guildId: "mint",
+              slug: "",
+              name: "Adventures of Mint",
+              updatedAt: now(),
+            }),
+            characters: [...(game?.characters || []), ...additions],
+          };
+        },
+        { descriptions: seed.descriptions },
+      );
     }
   }
 
@@ -224,7 +227,7 @@ export class StudioStore {
     return { id, character: snapshot, image, description, source };
   }
 
-  update(gameId, change) {
+  update(gameId, change, { descriptions = {} } = {}) {
     return this.transaction(() => {
       const current = this.read(gameId);
       const next = change(current);
@@ -247,6 +250,7 @@ export class StudioStore {
             .run(gameId, character.id, JSON.stringify(character), now());
           const version = this.addVersion(gameId, character, {
             source: "original",
+            description: descriptions[character.preset] || "",
           });
           this.db
             .prepare(

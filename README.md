@@ -39,7 +39,7 @@ The **TV episode look** is on by default: color grading, paper grain, fine broad
 
 ## Cast & workshop
 
-All 14 named characters are playable: **Mint, Baguette, Sarina, David, Ghost, Rocky, Miel, Zippy, Jat, Loralei, Samira, Genesis, Kain, and Footjobofsteel**. Genesis’s puppy and leash move with his sprite. Customized friends are retained from older saves; the workshop supports up to 24 characters.
+All 16 named characters are playable: **Mint, Baguette, Sarina, David, Ghost, Rocky, Miel, Zippy, Jat, Loralei, Samira, Genesis, Kain, Footjobofsteel, steakbutterfan, and blindian**. Genesis’s puppy and leash move with his sprite. steakbutterfan carries his oversized burger. blindian is especially tall, with vertically split hip-hop and traditional Indian clothing. Customized friends are retained from older saves; the workshop supports up to 24 characters.
 
 Open **Pause → Character workshop** or the workshop button in the picker to edit names, upload transparent PNG/WebP sprites (under 1 MB), or export/import the crew. Restore a standard cutout to edit individual appearance traits. Generated character sprites have a fixed appearance.
 

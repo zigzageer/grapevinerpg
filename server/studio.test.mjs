@@ -315,6 +315,69 @@ test("website towns read published manifests and preserve website versions durin
   assert.equal(service.quota(IP).used, 1);
 });
 
+test("new built-in characters merge into existing studios without replacing generations or quotas", async (t) => {
+  const { service, store, directory } = setup(t);
+  const job = await service.enqueue(
+    input({ characterId: "friend-8", name: "Custom Miel" }),
+    IP,
+  );
+  await done(service);
+  const version = store.job(job.id, service.ipHash(IP)).result.versionId;
+  store.apply("mint", "friend-8", version);
+  const history = store.history("mint", "friend-8");
+  const additions = [
+    {
+      ...base,
+      id: "cast-steakbutterfan",
+      name: "steakbutterfan",
+      preset: "steakbutterfan",
+    },
+    {
+      ...base,
+      id: "cast-blindian",
+      name: "blindian",
+      preset: "blindian",
+      heightScale: 1.45,
+    },
+  ];
+  const updatedSeed = {
+    ...seed,
+    characters: [...seed.characters, ...additions],
+    descriptions: {
+      ...seed.descriptions,
+      steakbutterfan: "An oversized burger",
+      blindian: "Very tall, with a split outfit",
+    },
+  };
+  for (let restart = 0; restart < 2; restart++) {
+    const reopened = new StudioStore({ directory, seed: updatedSeed });
+    try {
+      assert.equal(reopened.read("mint").characters.length, 4);
+      assert.equal(
+        reopened.read("mint").characters.find((c) => c.id === "friend-8").name,
+        "Custom Miel",
+      );
+      assert.deepEqual(reopened.history("mint", "friend-8"), history);
+      assert.equal(reopened.quota(service.ipHash(IP)).used, 1);
+      assert.equal(
+        reopened.history("mint", "cast-blindian").versions.length,
+        1,
+      );
+      assert.equal(
+        reopened.history("mint", "cast-blindian").versions[0].description,
+        updatedSeed.descriptions.blindian,
+      );
+      assert.equal(
+        reopened.read("mint").characters.find((c) => c.id === "cast-blindian")
+          .heightScale,
+        1.45,
+      );
+    } finally {
+      reopened.close();
+    }
+  }
+});
+
 test("bridge signatures bind method, path, client IP, timestamp and body", () => {
   const timestamp = String(Date.now());
   const body = Buffer.from('{"name":"Bob"}');

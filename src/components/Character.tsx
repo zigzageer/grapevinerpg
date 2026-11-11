@@ -1,17 +1,32 @@
 import { useId } from "react";
 import { characterArtUrl } from "../game/art";
 import type { Character as CharacterData } from "../game/model";
-export function CharacterArt({
-  c,
-  moving = false,
-  facing = 1,
-  portrait = false,
-}: {
+import { characterScale } from "../game/model";
+
+interface ArtProps {
   c: CharacterData;
   moving?: boolean;
   facing?: number;
   portrait?: boolean;
-}) {
+}
+
+export function CharacterArt(props: ArtProps) {
+  const scale = characterScale(props.c);
+  return (
+    <g
+      transform={`translate(${75 * (1 - scale)} ${180 * (1 - scale)}) scale(${scale})`}
+    >
+      <CharacterCutout {...props} />
+    </g>
+  );
+}
+
+function CharacterCutout({
+  c,
+  moving = false,
+  facing = 1,
+  portrait = false,
+}: ArtProps) {
   const id = useId().replace(/:/g, "");
   if (c.kind === "mint" && !c.sprite)
     return (
@@ -165,10 +180,11 @@ export function Portrait({
   c: CharacterData;
   className?: string;
 }) {
+  const scale = characterScale(c);
   return (
     <svg
       className={`portrait ${className}`}
-      viewBox="0 0 150 180"
+      viewBox={`${75 * (1 - scale)} ${180 * (1 - scale)} ${150 * scale} ${180 * scale}`}
       aria-label={c.name}
     >
       <CharacterArt c={c} portrait />

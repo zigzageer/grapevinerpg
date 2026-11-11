@@ -6,6 +6,16 @@ export const ADDITIONAL_BIOS: Partial<
     { title: string; description: string }
   >
 > = {
+  steakbutterfan: {
+    title: "The burger comes along.",
+    description:
+      "steakbutterfan is a heavyset man with dark brown skin, a shaved head, a broad cheerful face, a white T-shirt, a purple beaded necklace, dark trousers and sneakers. He holds an enormous layered hamburger with both hands near his mouth, complete with beef, cheese, lettuce, tomato, sauce and a pickle garnish.",
+  },
+  blindian: {
+    title: "Very tall, with two styles.",
+    description:
+      "blindian is an exceptionally tall, lanky Black-and-Indian man with a vertical split down his face and outfit. One half has a crisp shape-up, an edged beard and goatee, hip-hop streetwear, a chain, a trouser leg and a high-top sneaker. The other half has combed-over hair, half a red forehead dot, a traditional Indian kurta, a traditional trouser leg and a jutti shoe.",
+  },
   loralei: {
     title: "Meet Loralei.",
     description:

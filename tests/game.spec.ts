@@ -16,6 +16,8 @@ const cast = [
   "Genesis",
   "Kain",
   "Footjobofsteel",
+  "steakbutterfan",
+  "blindian",
 ];
 async function picker(page: Page) {
   await page
@@ -255,7 +257,7 @@ test("the game fills the screen immediately and every character can be played", 
   ).toHaveCount(0);
   for (const name of cast) {
     const choices = await picker(page);
-    await expect(choices.getByRole("button")).toHaveCount(14);
+    await expect(choices.getByRole("button")).toHaveCount(16);
     await choices
       .getByRole("button", { name: `Play as ${name}`, exact: true })
       .click();
@@ -274,6 +276,49 @@ test("the game fills the screen immediately and every character can be played", 
       .toBeGreaterThan(x + 4);
   }
   expect(errors).toEqual([]);
+});
+
+test("blindian is taller in town and duels while both new sprites load", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const choices = await picker(page);
+  await choices
+    .getByRole("button", { name: "Play as blindian", exact: true })
+    .click();
+  const sprite = page.getByTestId("player-sprite");
+  await expect(sprite.locator("image")).toHaveAttribute(
+    "href",
+    "/characters/blindian.png",
+  );
+  const tallBounds = await sprite.locator(".paper-person").boundingBox();
+  const normalBounds = await page
+    .locator('[data-character="friend-4"] .paper-person')
+    .boundingBox();
+  expect(tallBounds!.height / normalBounds!.height).toBeCloseTo(1.45, 2);
+  await page
+    .getByRole("button", { name: "Interact with Sarina", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Fight", exact: true }).click();
+  const stage = (await page.locator(".duo-stage").boundingBox())!;
+  const tall = (await page
+    .locator(".duo-fighter.player .paper-person")
+    .boundingBox())!;
+  const normal = (await page
+    .locator(".duo-fighter.opponent .paper-person")
+    .boundingBox())!;
+  expect(tall.height / normal.height).toBeCloseTo(1.45, 2);
+  expect(tall.y).toBeGreaterThanOrEqual(stage.y);
+  expect(tall.y + tall.height).toBeLessThanOrEqual(stage.y + stage.height);
+  await page.getByRole("button", { name: "Close dialog", exact: true }).click();
+  const next = await picker(page);
+  await next
+    .getByRole("button", { name: "Play as steakbutterfan", exact: true })
+    .click();
+  await expect(sprite.locator("image")).toHaveAttribute(
+    "href",
+    "/characters/steakbutterfan.png",
+  );
 });
 
 test("clicking a citizen, following movement, and restoring the save all work", async ({
