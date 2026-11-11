@@ -21,6 +21,7 @@ export async function studioGateway(
     );
   const url = new URL(request.url);
   // Vercel can serialize catch-all segments into the route query parameter.
+  const parameterNames = [...url.searchParams.keys()];
   const segments = url.searchParams.getAll("route");
   const path =
     segments.length === 1
@@ -28,12 +29,17 @@ export async function studioGateway(
       : url.pathname.replace(/^\/api\/studio/, "");
   url.searchParams.delete("route");
   if (
-    url.search ||
     segments.length > 1 ||
     !(request.method === "GET" ? readRoute : writeRoute).test(path) ||
     !["GET", "POST"].includes(request.method)
-  )
+  ) {
+    console.warn("[studio] Unmatched public route", {
+      method: request.method,
+      pathname: url.pathname,
+      parameterNames,
+    });
     return json("Studio endpoint not found.", 404);
+  }
   if (!env.MINT_STUDIO_ORIGIN || !env.MINT_STUDIO_CA)
     return json(
       "The character studio is being connected. Please try again shortly.",

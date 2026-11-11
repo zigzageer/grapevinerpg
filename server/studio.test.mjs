@@ -449,3 +449,26 @@ test("gateway supports Vercel catch-all query routing while preserving its publi
     404,
   );
 });
+
+test("public studio routes tolerate framework query metadata", async () => {
+  const env = {
+    MINT_STUDIO_ORIGIN: "https://studio.example",
+    MINT_STUDIO_CA: "test certificate",
+    VERCEL_OIDC_TOKEN: "test identity",
+  };
+  const response = await studioGateway(
+    new Request(
+      "https://game.example/api/studio/health?__framework_path=health",
+      { headers: { "x-vercel-forwarded-for": IP } },
+    ),
+    {
+      env,
+      transport: async () => ({
+        status: 200,
+        type: "application/json",
+        bytes: Buffer.from('{"ok":true}'),
+      }),
+    },
+  );
+  assert.equal(response.status, 200);
+});
