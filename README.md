@@ -1,5 +1,7 @@
 # Adventures of Mint
 
+**Live game:** https://adventures-of-mint.vercel.app
+
 A small, playable 2D cutout browser demo starring Mint and the whole cast. **Choose any character and move around Grapevine.** This version has no story, quests, combat, or dialogue flow.
 
 ## Play the demo
@@ -19,7 +21,7 @@ For the regular development website, use Node 22.12+ or 24:
 npm run dev
 ```
 
-Open the address Vite prints (port 5173). Vercel uses `npm run build` and serves `dist/`, as configured in `vercel.json`. No environment variables are required. The site has not been deployed by this task.
+Open the address Vite prints (port 5173). Vercel uses `npm run build` and serves `dist/`, as configured in `vercel.json`. No environment variables are required. The production site is deployed at https://adventures-of-mint.vercel.app.
 
 ## Controls
 
