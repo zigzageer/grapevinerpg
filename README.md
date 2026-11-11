@@ -30,7 +30,8 @@ Open the address Vite prints (port 5173). Vercel uses `npm run build` and serves
 - Click/tap the ground to walk there, with pathfinding around obstacles.
 - `[` and `]` to switch characters without changing your position.
 - C opens the character workshop; H opens controls; Escape closes dialogs.
-- On phones, use tap-to-walk or the direction pad. The camera follows you.
+- The camera starts close to your character and follows as you walk on desktop and phone. Use the +/− controls to adjust the view.
+- On phones, use tap-to-walk or the direction pad.
 - “Back to center” returns the active character to the town center.
 
 The selected character, position, custom cast and names save in this browser. Saves are local to the current file or website origin. Export a crew backup from the workshop before clearing site data or changing domains.

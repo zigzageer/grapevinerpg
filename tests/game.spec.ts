@@ -61,9 +61,9 @@ test("clicking a citizen switches control and the character and position survive
   await page.goto("/");
   await page
     .getByTestId("town")
-    .getByRole("button", { name: "Play as Genesis", exact: true })
+    .getByRole("button", { name: "Play as Sarina", exact: true })
     .click();
-  await expect(page.locator(".demo-selected h2")).toHaveText("Genesis");
+  await expect(page.locator(".demo-selected h2")).toHaveText("Sarina");
   const sprite = page.getByTestId("player-sprite");
   const initial = Number(await sprite.getAttribute("data-x"));
   await page.keyboard.down("a");
@@ -75,23 +75,25 @@ test("clicking a citizen switches control and the character and position survive
   const last = Number(await sprite.getAttribute("data-x"));
   await page.waitForTimeout(500);
   await page.reload();
-  await expect(page.locator(".demo-selected h2")).toHaveText("Genesis");
+  await expect(page.locator(".demo-selected h2")).toHaveText("Sarina");
   await expect
     .poll(async () => Number(await sprite.getAttribute("data-x")))
     .toBeCloseTo(last, 0);
   await page.getByRole("button", { name: "Reset position" }).click();
   await expect(sprite).toHaveAttribute("data-x", "680");
   // A real click-to-walk request, separate from keyboard movement.
-  const town = await page.getByTestId("town").boundingBox();
-  await page.mouse.click(
-    town!.x + (town!.width * 1010) / 1400,
-    town!.y + (town!.height * 810) / 900,
-  );
+  const destination = await page.getByTestId("town").evaluate((svg) => {
+    const p = new DOMPoint(895, 610).matrixTransform(
+      (svg as unknown as SVGSVGElement).getScreenCTM()!,
+    );
+    return { x: p.x, y: p.y };
+  });
+  await page.mouse.click(destination.x, destination.y);
   await expect
     .poll(async () => Number(await sprite.getAttribute("data-x")), {
       timeout: 10000,
     })
-    .toBeGreaterThan(990);
+    .toBeGreaterThan(875);
 });
 
 test("mobile touch controls, character search, and camera work without page overflow", async ({
@@ -209,4 +211,52 @@ test("standalone HTML needs no network after its initial document loads", async 
     .poll(async () => Number(await sprite.getAttribute("data-x")))
     .toBeGreaterThan(x + 15);
   expect(outbound).toEqual([]);
+});
+
+test("camera follows the active character closely through walking, zoom, and fullscreen", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const town = page.getByTestId("town"),
+    sprite = page.getByTestId("player-sprite");
+  const readView = async () =>
+    (await town.getAttribute("viewBox"))!.split(" ").map(Number);
+  await expect.poll(async () => (await readView())[3]).toBe(300);
+  const clip = await page.locator(".scene-clip").boundingBox();
+  const initial = await sprite.boundingBox();
+  expect(initial!.height).toBeGreaterThan(clip!.height * 0.24);
+  expect(
+    Math.abs(initial!.x + initial!.width / 2 - (clip!.x + clip!.width / 2)),
+  ).toBeLessThan(4);
+  const before = await readView();
+  await page.keyboard.down("d");
+  await page.waitForTimeout(450);
+  await page.keyboard.up("d");
+  await page.waitForTimeout(100);
+  const after = await readView();
+  expect(after[0]).toBeGreaterThan(before[0] + 40);
+  const moved = await sprite.boundingBox();
+  expect(
+    Math.abs(moved!.x + moved!.width / 2 - (clip!.x + clip!.width / 2)),
+  ).toBeLessThan(4);
+  await page.getByRole("button", { name: "Zoom in", exact: true }).click();
+  await expect.poll(async () => (await readView())[3]).toBeLessThan(300);
+  await page.getByRole("button", { name: "Zoom out", exact: true }).click();
+  await expect.poll(async () => (await readView())[3]).toBe(300);
+  await page
+    .getByRole("button", { name: "Fullscreen game", exact: true })
+    .click();
+  await expect
+    .poll(() => page.evaluate(() => !!document.fullscreenElement))
+    .toBe(true);
+  const fullClip = await page.locator(".scene-clip").boundingBox(),
+    fullSprite = await sprite.boundingBox();
+  expect(
+    Math.abs(
+      fullSprite!.x +
+        fullSprite!.width / 2 -
+        (fullClip!.x + fullClip!.width / 2),
+    ),
+  ).toBeLessThan(6);
+  await page.evaluate(() => document.exitFullscreen());
 });

@@ -644,7 +644,6 @@ button:active:not(:disabled) {
 .scene-world {
   width: 100%;
   height: 100%;
-  transition: transform 0.3s;
 }
 .town-svg {
   width: 100%;
@@ -2404,8 +2403,7 @@ kbd {
   }
   .scene-world {
     height: 100%;
-    width: 160%;
-    margin-left: var(--camera-offset, -30%);
+    width: 100%;
   }
   .scene-world .town-svg {
     height: 100%;

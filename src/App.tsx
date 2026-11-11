@@ -1,10 +1,4 @@
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  type CSSProperties,
-} from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowDown,
   ArrowLeft,
@@ -34,6 +28,7 @@ import {
   START,
 } from "./game/model";
 import { characterArtUrl } from "./game/art";
+import { DEFAULT_ZOOM, MIN_ZOOM, MAX_ZOOM, followCamera } from "./game/camera";
 import { findPath } from "./game/navigation";
 import { Town } from "./components/Town";
 import { Portrait } from "./components/Character";
@@ -71,7 +66,7 @@ export default function App() {
     [target, setTarget] = useState<Point | null>(null);
   const [panel, setPanel] = useState<"crew" | "help" | null>(null),
     [search, setSearch] = useState("");
-  const [zoom, setZoom] = useState(1),
+  const [zoom, setZoom] = useState(DEFAULT_ZOOM),
     [toast, setToast] = useState(""),
     [saved, setSaved] = useState<"saved" | "saving" | "failed">("saved");
   const position = useRef(player),
@@ -79,6 +74,9 @@ export default function App() {
     path = useRef<Point[]>([]),
     state = useRef(game),
     blocked = useRef(false);
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const [aspectRatio, setAspectRatio] = useState(14 / 9);
+  const camera = followCamera(player, aspectRatio, zoom);
   const sceneRef = useRef<HTMLDivElement>(null),
     timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const selectRef = useRef<(direction: number) => void>(() => {}),
@@ -133,8 +131,20 @@ export default function App() {
     stop();
     position.current = { ...START };
     setPlayer({ ...START });
-    setZoom(1);
+    setZoom(DEFAULT_ZOOM);
   };
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+    const measure = () => {
+      const { width, height } = viewport.getBoundingClientRect();
+      if (width > 0 && height > 0) setAspectRatio(width / height);
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(viewport);
+    return () => observer.disconnect();
+  }, []);
   useEffect(() => {
     let frame = 0,
       last = 0,
@@ -463,21 +473,14 @@ export default function App() {
                   </div>
                 </div>
                 <span className="scene-button demo-live">
-                  <span className="live-dot" /> TAKE A WALK
+                  <span className="live-dot" /> FOLLOWING{" "}
+                  {active.name.toUpperCase()}
                 </span>
               </div>
-              <div className="scene-clip">
-                <div
-                  className="scene-world"
-                  style={
-                    {
-                      transform: `scale(${zoom})`,
-                      transformOrigin: `${player.x / 14}% ${player.y / 9}%`,
-                      "--camera-offset": `${Math.max(-60, Math.min(0, 50 - (player.x / 14) * 1.6))}%`,
-                    } as CSSProperties
-                  }
-                >
+              <div className="scene-clip" ref={viewportRef}>
+                <div className="scene-world">
                   <Town
+                    camera={camera}
                     player={player}
                     moving={moving}
                     facing={facing}
@@ -501,16 +504,16 @@ export default function App() {
                   <button
                     className="scene-button square"
                     aria-label="Zoom out"
-                    disabled={zoom === 1}
-                    onClick={() => setZoom((z) => Math.max(1, z - 0.2))}
+                    disabled={zoom <= MIN_ZOOM}
+                    onClick={() => setZoom((z) => Math.max(MIN_ZOOM, z - 0.5))}
                   >
                     <Minus size={17} />
                   </button>
                   <button
                     className="scene-button square"
                     aria-label="Zoom in"
-                    disabled={zoom >= 1.6}
-                    onClick={() => setZoom((z) => Math.min(1.6, z + 0.2))}
+                    disabled={zoom >= MAX_ZOOM}
+                    onClick={() => setZoom((z) => Math.min(MAX_ZOOM, z + 0.5))}
                   >
                     <Plus size={17} />
                   </button>
@@ -666,8 +669,8 @@ export default function App() {
                 <Compass size={22} />
               </span>
               <p>
-                Click or tap the ground to walk there. Mint and friends find a
-                path around obstacles.
+                The camera follows your character. Click or tap the ground to
+                walk there. Mint and friends find a path around obstacles.
               </p>
             </div>
             <div>

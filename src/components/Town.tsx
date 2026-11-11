@@ -1,6 +1,7 @@
 import { memo } from "react";
 import type { Character, Point } from "../game/model";
 import { characterKey } from "../game/model";
+import type { CameraView } from "../game/camera";
 import { CharacterArt } from "./Character";
 
 function Pine({
@@ -475,6 +476,7 @@ const Scenery = memo(function Scenery() {
   );
 });
 interface Props {
+  camera: CameraView;
   player: Point;
   moving: boolean;
   facing: number;
@@ -505,6 +507,7 @@ const CITIZEN_SPOTS: Point[] = [
   { x: 1080, y: 540 },
 ];
 export function Town({
+  camera,
   player,
   moving,
   facing,
@@ -527,7 +530,7 @@ export function Town({
     <svg
       data-testid="town"
       className="town-svg"
-      viewBox="0 0 1400 900"
+      viewBox={`${camera.x} ${camera.y} ${camera.width} ${camera.height}`}
       aria-label="Grapevine free-roam town. Click the ground to walk or a character to play as them."
       onPointerDown={(e) => {
         if (e.button !== 0) return;
