@@ -8,7 +8,7 @@ Each IP gets **three lifetime generation attempts across all towns**. Accepted a
 
 ## Runtime
 
-The React site calls `api/studio/[...route].mjs`. This Vercel Function proxies a bounded set of public studio routes over HTTPS to the Ubuntu service. Vercel's short-lived OIDC token authenticates the production team and project. The service validates issuer, audience, subject, project ID, team ID, expiration, and signing keys. The gateway forwards Vercel's platform-provided client IP for quota enforcement.
+The React site calls `api/studio.mjs`. This Vercel Function proxies a bounded set of public studio routes over HTTPS to the Ubuntu service. Vercel's short-lived OIDC token authenticates the production team and project. The service validates issuer, audience, subject, project ID, team ID, expiration, and signing keys. The gateway forwards Vercel's platform-provided client IP for quota enforcement.
 
 The Ubuntu service serializes image jobs through the existing Codex CLI and saved ChatGPT login. Discord `/game create` and `/game add` use this service through authenticated internal routes. New roster data becomes available immediately through the API. Generated images and history are stored in SQLite plus immutable PNG files.
 
