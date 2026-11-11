@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.vite/
+*.tsbuildinfo
+test-results/
+playwright-report/
+.env*
+!.env.example
+
+artifacts/
+
+.vercel/
