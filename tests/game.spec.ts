@@ -259,6 +259,9 @@ test("the standalone game needs no network after loading", async ({ page }) => {
     "href",
     /^data:image\/png;base64,/,
   );
+  await expect(page.locator(".scenery image")).toHaveCount(4);
+  for (const image of await page.locator(".scenery image").all())
+    await expect(image).toHaveAttribute("href", /^data:image\/png;base64,/);
   const x = Number(await sprite.getAttribute("data-x"));
   await page.keyboard.down("d");
   await page.waitForTimeout(200);
@@ -267,6 +270,66 @@ test("the standalone game needs no network after loading", async ({ page }) => {
     .poll(async () => Number(await sprite.getAttribute("data-x")))
     .toBeGreaterThan(x + 15);
   expect(outbound).toEqual([]);
+});
+
+test("the town map routes the character to the school and neighborhood", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const art = await page.locator(".scenery image").evaluateAll(async (images) =>
+    Promise.all(
+      images.map(
+        (el) =>
+          new Promise<boolean>((resolve) => {
+            const image = new Image();
+            image.onload = () => resolve(image.naturalWidth > 100);
+            image.onerror = () => resolve(false);
+            image.src = el.getAttribute("href")!;
+          }),
+      ),
+    ),
+  );
+  expect(art).toEqual([true, true, true, true]);
+  await page.getByRole("button", { name: "Town map", exact: true }).click();
+  await expect(
+    page.getByRole("group", { name: "Town destinations" }).getByRole("button"),
+  ).toHaveCount(10);
+  await page
+    .getByRole("button", { name: "Walk to South Park Elementary", exact: true })
+    .click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  const sprite = page.getByTestId("player-sprite");
+  await expect
+    .poll(async () => Number(await sprite.getAttribute("data-y")), {
+      timeout: 15000,
+    })
+    .toBeCloseTo(1160, 0);
+  expect(Number(await sprite.getAttribute("data-x"))).toBeCloseTo(560, 0);
+  await expect(page.locator(".hud-location strong")).toHaveText(
+    "School & civic center",
+  );
+  await page.keyboard.press("m");
+  await page
+    .getByRole("button", { name: "Walk to McCormick Residence", exact: true })
+    .click();
+  await expect
+    .poll(async () => Number(await sprite.getAttribute("data-y")), {
+      timeout: 18000,
+    })
+    .toBeCloseTo(1870, 0);
+  expect(Number(await sprite.getAttribute("data-x"))).toBeCloseTo(1700, 0);
+  await expect(page.locator(".hud-location strong")).toHaveText(
+    "The neighborhood",
+  );
+  await page.keyboard.press("m");
+  await page
+    .getByRole("button", { name: "Walk to Tweek Bros. Coffee", exact: true })
+    .click();
+  await expect(page.locator(".walk-target")).toHaveCount(1);
+  await page.keyboard.down("d");
+  await page.waitForTimeout(150);
+  await page.keyboard.up("d");
+  await expect(page.locator(".walk-target")).toHaveCount(0);
 });
 
 test.describe("touch game", () => {

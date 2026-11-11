@@ -31,7 +31,7 @@ export function followCamera(
   const desiredHeight =
     pixels && baseScale
       ? pixels / ((baseScale * scale) / DEFAULT_ZOOM)
-      : WORLD.height / scale;
+      : 900 / scale;
   const height = Math.min(WORLD.height, desiredHeight, WORLD.width / aspect);
   const width = height * aspect;
   return {

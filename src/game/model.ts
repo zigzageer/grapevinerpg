@@ -1,3 +1,5 @@
+import { WORLD, WALK_BOUNDS, TOWN_OBSTACLES } from "./locations";
+export { WORLD };
 export type Point = { x: number; y: number };
 export type Hair = "short" | "messy" | "long" | "curly" | "bald";
 export type Hat = "none" | "beanie" | "cap";
@@ -42,7 +44,6 @@ export interface SaveGame {
   sound: boolean;
 }
 export const SAVE_KEY = "grapevine.save.v1";
-export const WORLD = { width: 1400, height: 900 };
 export const START: Point = { x: 680, y: 560 };
 export const BAGUETTE_GUY: Character = {
   id: "friend-3",
@@ -379,22 +380,13 @@ export function parseCrew(input: unknown): Character[] {
   });
 }
 // Tree trunks and building footprints; movement uses the feet, not the sprite bounds.
-export const OBSTACLES = [
-  { x: 94, y: 295, w: 253, h: 173 },
-  { x: 404, y: 308, w: 250, h: 159 },
-  { x: 750, y: 280, w: 232, h: 185 },
-  { x: 1110, y: 330, w: 210, h: 126 },
-  { x: 610, y: 685, w: 120, h: 56 },
-  { x: 1130, y: 715, w: 130, h: 48 },
-  { x: 86, y: 674, w: 30, h: 36 },
-  { x: 298, y: 733, w: 25, h: 25 },
-];
+export const OBSTACLES = TOWN_OBSTACLES;
 export function canStand(p: Point): boolean {
   return (
-    p.x >= 35 &&
-    p.x <= 1365 &&
-    p.y >= 475 &&
-    p.y <= 865 &&
+    p.x >= WALK_BOUNDS.left &&
+    p.x <= WALK_BOUNDS.right &&
+    p.y >= WALK_BOUNDS.top &&
+    p.y <= WALK_BOUNDS.bottom &&
     !OBSTACLES.some(
       (r) =>
         p.x > r.x - 15 &&

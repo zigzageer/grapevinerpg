@@ -9,49 +9,48 @@ import {
   normalizeCharacter,
   parseCrew,
   START,
-  spots,
 } from "./model";
 import { findPath } from "./navigation";
+import { LOCATIONS } from "./locations";
 describe("town movement", () => {
-  it("keeps feet within town and outside the fountain", () => {
+  it("keeps feet within town and outside the school", () => {
     expect(canStand(START)).toBe(true);
-    expect(movePlayer({ x: 620, y: 670 }, 0, 25)).toEqual({ x: 620, y: 670 });
-    expect(movePlayer({ x: 36, y: 550 }, -20, 0)).toEqual({ x: 36, y: 550 });
+    expect(movePlayer({ x: 550, y: 730 }, 0, 35)).toEqual({ x: 550, y: 730 });
+    expect(movePlayer({ x: 41, y: 550 }, -20, 0)).toEqual({ x: 41, y: 550 });
     expect(movePlayer(START, 15, 0)).toEqual({ x: 695, y: 560 });
   });
-  it("finds traversable routes between every quest destination, including around the fountain", () => {
-    const locations = [
-      START,
-      ...spots.map((s) => s.destination),
-      { x: 665, y: 825 },
-    ];
-    for (const from of locations)
-      for (const to of locations) {
-        const path = findPath(from, to);
-        expect(path.length).toBeGreaterThan(0);
-        let p = from;
-        for (const step of path) {
-          const count = Math.max(
-            1,
-            Math.ceil(Math.hypot(step.x - p.x, step.y - p.y) / 3),
-          );
-          for (let n = 1; n <= count; n++)
-            expect(
-              canStand({
-                x: p.x + ((step.x - p.x) * n) / count,
-                y: p.y + ((step.y - p.y) * n) / count,
-              }),
-            ).toBe(true);
-          p = step;
-        }
-        expect(p).toEqual(to);
+  it("connects every South Park location by safe walking routes across all three blocks", () => {
+    const destinations = LOCATIONS.map((s) => s.entrance);
+    const trips = destinations.flatMap((to, i) => [
+      [START, to],
+      [to, destinations[(i + 1) % destinations.length]],
+    ]);
+    for (const [from, to] of trips) {
+      const path = findPath(from, to);
+      expect(path.length).toBeGreaterThan(0);
+      let p = from;
+      for (const step of path) {
+        const count = Math.max(
+          1,
+          Math.ceil(Math.hypot(step.x - p.x, step.y - p.y) / 3),
+        );
+        for (let n = 1; n <= count; n++)
+          expect(
+            canStand({
+              x: p.x + ((step.x - p.x) * n) / count,
+              y: p.y + ((step.y - p.y) * n) / count,
+            }),
+          ).toBe(true);
+        p = step;
       }
+      expect(p).toEqual(to);
+    }
   });
   it("finds a safe point for clicks on obstacles and outside town", () => {
     for (const target of [
-      { x: 665, y: 710 },
+      { x: 550, y: 900 },
       { x: -100, y: 100 },
-      { x: 1500, y: 950 },
+      { x: 2600, y: 2400 },
     ]) {
       const p = findPath(START, target);
       expect(p.length).toBeGreaterThan(0);
@@ -187,10 +186,29 @@ describe("cast updates and saved characters", () => {
   });
 });
 
-it("large movement updates cannot skip through the fountain", () => {
-  const stopped = movePlayerInSteps({ x: 570, y: 710 }, 230, 0);
-  expect(stopped.x).toBeLessThan(595);
-  expect(stopped.x).toBeGreaterThan(580);
-  expect(stopped.y).toBe(710);
+it("large movement updates cannot skip through school walls", () => {
+  const stopped = movePlayerInSteps({ x: 1000, y: 900 }, -1000, 0);
+  expect(stopped.x).toBeGreaterThanOrEqual(980);
+  expect(stopped.x).toBeLessThan(990);
+  expect(stopped.y).toBe(900);
   expect(canStand(stopped)).toBe(true);
+});
+
+it("moves an old save out of a new building while retaining the cast and TV setting", () => {
+  vi.stubGlobal("localStorage", {
+    getItem: () =>
+      JSON.stringify({
+        ...initialSave(),
+        player: { x: 800, y: 900 },
+        tvLook: false,
+      }),
+  });
+  try {
+    const saved = loadSave();
+    expect(saved.player).toEqual(START);
+    expect(saved.crew).toHaveLength(DEFAULT_CREW.length);
+    expect(saved.tvLook).toBe(false);
+  } finally {
+    vi.unstubAllGlobals();
+  }
 });

@@ -7,6 +7,7 @@ import {
   Compass,
   Keyboard,
   MapPin,
+  Map,
   Maximize2,
   Menu,
   Pencil,
@@ -34,8 +35,10 @@ import { Portrait } from "./components/Character";
 import { Modal } from "./components/Modal";
 import { CrewEditor } from "./components/CrewEditor";
 import { TouchJoystick } from "./components/TouchJoystick";
+import { TownMap } from "./components/TownMap";
+import { TOWN_NAME, districtAt } from "./game/locations";
 
-type Panel = "characters" | "crew" | "help" | "pause" | null;
+type Panel = "characters" | "crew" | "help" | "pause" | "map" | null;
 function loadDemo(): SaveGame {
   const saved = loadSave();
   return {
@@ -128,7 +131,6 @@ export default function App() {
   );
   openRef.current = open;
   const walkTo = (point: Point) => {
-    if (blocked.current) return;
     const route = findPath(position.current, point);
     if (!route.length) {
       notify("Try the path around it.");
@@ -210,7 +212,9 @@ export default function App() {
               next.x - position.current.x,
               next.y - position.current.y,
             );
-          if (distance < 5) {
+          if (distance < 0.05) {
+            position.current = next;
+            setPlayer(next);
             path.current.shift();
             if (!path.current.length) setTarget(null);
           } else {
@@ -286,6 +290,10 @@ export default function App() {
       if (key === "h") {
         e.preventDefault();
         openRef.current("help");
+      }
+      if (key === "m") {
+        e.preventDefault();
+        openRef.current("map");
       }
       if (key === "escape" || key === "p") {
         e.preventDefault();
@@ -393,7 +401,9 @@ export default function App() {
               crew={game.crew}
               activeKey={activeKey}
               target={target}
-              onMove={walkTo}
+              onMove={(point) => {
+                if (!blocked.current) walkTo(point);
+              }}
               onSelect={select}
             />
           </div>
@@ -421,7 +431,7 @@ export default function App() {
                   {active.name}
                 </strong>
                 <span className="hud-player-place">
-                  <MapPin size={10} /> Grapevine
+                  <MapPin size={10} /> {TOWN_NAME}
                 </span>
               </span>
               <span
@@ -439,6 +449,13 @@ export default function App() {
               />
             </button>
             <div className="hud-actions">
+              <button
+                className="hud-icon"
+                aria-label="Town map"
+                onClick={() => open("map")}
+              >
+                <Map size={21} />
+              </button>
               {canFullscreen && (
                 <button
                   className="hud-icon desktop-fullscreen"
@@ -458,8 +475,8 @@ export default function App() {
             </div>
           </header>
           <div className="hud-location">
-            <span>FREE ROAM</span>
-            <strong>Grapevine</strong>
+            <span>{TOWN_NAME.toUpperCase()} · FREE ROAM</span>
+            <strong>{districtAt(player)}</strong>
             <span className="location-rule" />
           </div>
           <div className="hud-keytips" aria-hidden="true">
@@ -570,6 +587,16 @@ export default function App() {
           </footer>
         </Modal>
       )}
+      {panel === "map" && (
+        <TownMap
+          player={player}
+          onClose={() => setPanel(null)}
+          onWalk={(point) => {
+            setPanel(null);
+            walkTo(point);
+          }}
+        />
+      )}
       {panel === "pause" && (
         <Modal
           title="Take a breather."
@@ -591,6 +618,11 @@ export default function App() {
             <button onClick={() => open("crew")}>
               <Pencil size={19} />
               <span>Character workshop</span>
+              <ChevronRight size={17} />
+            </button>
+            <button onClick={() => open("map")}>
+              <Map size={20} />
+              <span>Town map</span>
               <ChevronRight size={17} />
             </button>
             <button onClick={() => open("help")}>

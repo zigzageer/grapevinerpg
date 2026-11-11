@@ -4,6 +4,12 @@
 
 A full-screen 2D browser game starring Mint and the whole cast. Open the game and start walking. The world fills the display; character selection, controls, and editing live in in-game overlays. This free-roam demo has no story or quests yet.
 
+The engine is custom **React + TypeScript + SVG**, with a frame-based movement loop, collision checks, A\* pathfinding, and a character-follow camera. It does not use Phaser, Unity, or a third-party game engine.
+
+The snowy town now uses AI-generated facades based on official South Park visual references: **Tweek Bros. Coffee, City Wok, Tom’s Rhinoplasty, South Park Elementary, Park County Police Station, and the Cartman, Marsh, Broflovski, and McCormick houses**, plus the bus stop. Downtown, the school/civic block, and the neighborhood connect through walkable streets. This is a playable arrangement of recognizable locations, not an exact canonical street map. See [reference and artwork notes](docs/town-reference.md).
+
+Open the **map button** or press **M**, then choose a destination to walk there. Movement controls immediately cancel the automatic route. Building names and house labels are defined in `src/game/locations.ts`; they are rendered separately from the images so they can be renamed later.
+
 ## Play on iPhone
 
 The game supports portrait and landscape, safe areas, a virtual thumbstick, and two-finger hold-to-run controls. Drag the thumbstick to move, or tap the ground to walk. Tap **Characters** to switch to anyone.
@@ -19,6 +25,7 @@ For a Safari-bar-free screen: open the live site in Safari → **Share → Add t
 - `[` and `]`: previous / next character.
 - Pause menu or Escape: pause, adjust zoom, toggle the TV look, reset position, or open the workshop.
 - H: controls. Escape closes an overlay.
+- M or the map button: town map and walking destinations.
 
 The camera follows the active character, with framing adapted to desktop, phone portrait, and phone landscape. Large movement updates use short collision steps so dropped frames do not cause slow movement or skip obstacles.
 
@@ -73,12 +80,15 @@ Saves are local to the browser and origin. Export a crew backup before clearing 
 - `src/App.tsx`: full-screen game, HUD, picker, pause menus, movement, and saving.
 - `src/game-screen.css`: game layout, safe areas, overlays, and TV treatment.
 - `src/components/TouchJoystick.tsx`: captured pointer input and direction controls.
-- `src/components/Town.tsx`: original town scenery and selectable cast.
+- `src/components/Town.tsx`: snowy town, generated facades, editable signs, and selectable cast.
+- `src/components/TownMap.tsx`: in-game town map and walking destinations.
+- `src/game/locations.ts`: town dimensions, location names, footprints, and entrances.
 - `src/components/Character.tsx`: sprite and editable cutout renderer.
 - `src/components/CrewEditor.tsx`: names, art, and import/export.
 - `src/game/model.ts`: cast, collisions, save validation and migration. Old quest flags are retained in saves but are not used by the demo.
 - `src/game/camera.ts` and `navigation.ts`: responsive character framing and pathfinding.
 - `public/manifest.webmanifest` and `public/icons/`: Home Screen support.
+- `public/scenery/`: generated downtown, school, police station, and neighborhood art.
 - `scripts/bundle-demo.mjs`: offline HTML packaging.
 
 Fonts and artwork are local. Gameplay makes no third-party requests; the external character creator only opens when selected in the workshop.
