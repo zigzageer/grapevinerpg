@@ -64,6 +64,12 @@ npm run bot:start
 
 This is a persistent Discord Gateway process; run it on a bot host, rather than in the Vercel static build. An existing bot that receives interactions through HTTP needs an adapter in its current interaction router instead of this Gateway runner.
 
+### Ubuntu Jackbox bot
+
+The Ubuntu Jackbox bot uses `createUbuntuGameHandler` from `bot/ubuntu-adapter.mjs`. Its existing `CODEX_OWNER_ID` is included in the allowed game managers. The adapter initializes game services on first use and replies privately if the GitHub configuration is incomplete.
+
+The installed modules live in `/opt/jackbox/repo/bot/src/rpg/`. The bot’s `src/commands.js` appends `gameDefinition` to its command definitions and routes `/game` to the adapter before checking the streaming session. `/game` is registered globally so the bot can serve each Discord server. The bot’s dependency lockfile includes `sharp` for sprite processing.
+
 ## Data and deployment
 
 1. The handler acknowledges the interaction privately before network work.
