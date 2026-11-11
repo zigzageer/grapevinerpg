@@ -20,9 +20,16 @@ export async function studioGateway(
       { status, headers: { "Cache-Control": "no-store" } },
     );
   const url = new URL(request.url);
-  const path = url.pathname.replace(/^\/api\/studio/, "");
+  // Vercel can serialize catch-all segments into the route query parameter.
+  const segments = url.searchParams.getAll("route");
+  const path =
+    segments.length === 1
+      ? `/${segments[0].replace(/^\/+/, "")}`
+      : url.pathname.replace(/^\/api\/studio/, "");
+  url.searchParams.delete("route");
   if (
     url.search ||
+    segments.length > 1 ||
     !(request.method === "GET" ? readRoute : writeRoute).test(path) ||
     !["GET", "POST"].includes(request.method)
   )

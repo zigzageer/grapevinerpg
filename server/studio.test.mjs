@@ -411,3 +411,41 @@ test("Vercel identity verification accepts only the configured production projec
   );
   assert.equal(await verify("invalid.token.data"), false);
 });
+
+test("gateway supports Vercel catch-all query routing while preserving its public route boundary", async () => {
+  const env = {
+    MINT_STUDIO_ORIGIN: "https://studio.example",
+    MINT_STUDIO_CA: "test certificate",
+    VERCEL_OIDC_TOKEN: "test-project-identity",
+  };
+  let forwarded;
+  const transport = async (args) => {
+    forwarded = args.path;
+    return {
+      status: 200,
+      type: "application/json",
+      bytes: Buffer.from('{"ok":true}'),
+    };
+  };
+  const headers = { "x-vercel-forwarded-for": IP };
+  const response = await studioGateway(
+    new Request("https://game.example/api/studio/[...route]?route=health", {
+      headers,
+    }),
+    { env, transport },
+  );
+  assert.equal(response.status, 200);
+  assert.equal(forwarded, "/health");
+  assert.equal(
+    (
+      await studioGateway(
+        new Request(
+          "https://game.example/api/studio/[...route]?route=internal/create",
+          { headers },
+        ),
+        { env, transport },
+      )
+    ).status,
+    404,
+  );
+});
