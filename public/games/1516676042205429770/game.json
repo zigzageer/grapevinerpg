@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "guildId": "1516676042205429770",
+  "name": "Mumbai Baddies",
+  "slug": "mumbai-baddies-1516676042205429770",
+  "characters": [],
+  "updatedAt": "2026-11-12T08:30:21.397Z",
+  "town": {
+    "path": "/games/1516676042205429770/town.json"
+  },
+  "botJobs": {
+    "e35eacca8ac32853f685b400": true
+  }
+}

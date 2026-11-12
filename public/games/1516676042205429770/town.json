@@ -1,0 +1,241 @@
+{
+  "version": 1,
+  "guildId": "1516676042205429770",
+  "name": "Baddie Bay",
+  "width": 1600,
+  "height": 1200,
+  "spawn": {
+    "x": 800,
+    "y": 540
+  },
+  "palette": {
+    "ground": "#f3dfbe",
+    "road": "#67aaa4",
+    "accent": "#eb776e"
+  },
+  "roads": [
+    {
+      "x": 80,
+      "y": 404,
+      "w": 1440,
+      "h": 192
+    },
+    {
+      "x": 704,
+      "y": 404,
+      "w": 192,
+      "h": 716
+    },
+    {
+      "x": 80,
+      "y": 904,
+      "w": 1440,
+      "h": 160
+    },
+    {
+      "x": 80,
+      "y": 500,
+      "w": 128,
+      "h": 564
+    },
+    {
+      "x": 1392,
+      "y": 500,
+      "w": 128,
+      "h": 564
+    }
+  ],
+  "buildings": [
+    {
+      "id": "baddie-hall",
+      "label": "Baddie Hall",
+      "kind": "hall",
+      "x": 620,
+      "y": 120,
+      "w": 360,
+      "h": 260,
+      "door": {
+        "x": 800,
+        "y": 424
+      },
+      "art": "/games/1516676042205429770/town/baddie-hall.webp"
+    },
+    {
+      "id": "general-exchange",
+      "label": "General Exchange",
+      "kind": "shop",
+      "x": 140,
+      "y": 160,
+      "w": 260,
+      "h": 220,
+      "door": {
+        "x": 270,
+        "y": 424
+      },
+      "art": "/games/1516676042205429770/town/general-exchange.webp"
+    },
+    {
+      "id": "asuka-atelier",
+      "label": "Asuka Atelier",
+      "kind": "workshop",
+      "x": 1200,
+      "y": 160,
+      "w": 260,
+      "h": 220,
+      "door": {
+        "x": 1330,
+        "y": 424
+      },
+      "art": "/games/1516676042205429770/town/asuka-atelier.webp"
+    },
+    {
+      "id": "textile-arcade",
+      "label": "Text Channels Arcade",
+      "kind": "venue",
+      "x": 220,
+      "y": 660,
+      "w": 280,
+      "h": 220,
+      "door": {
+        "x": 360,
+        "y": 924
+      },
+      "art": "/games/1516676042205429770/town/textile-arcade.webp"
+    },
+    {
+      "id": "rulekeepers-house",
+      "label": "Rulekeepers House",
+      "kind": "house",
+      "x": 1100,
+      "y": 660,
+      "w": 280,
+      "h": 220,
+      "door": {
+        "x": 1240,
+        "y": 924
+      },
+      "art": "/games/1516676042205429770/town/rulekeepers-house.webp"
+    }
+  ],
+  "landmarks": [
+    {
+      "id": "general-square",
+      "label": "General Square",
+      "kind": "plaza",
+      "x": 800,
+      "y": 700
+    },
+    {
+      "id": "asuka-stage",
+      "label": "Asuka Posting Stage",
+      "kind": "stage",
+      "x": 1296,
+      "y": 536
+    },
+    {
+      "id": "rules-garden",
+      "label": "Rules Garden",
+      "kind": "garden",
+      "x": 352,
+      "y": 1020
+    }
+  ],
+  "characterSpawns": [
+    {
+      "x": 240,
+      "y": 464
+    },
+    {
+      "x": 400,
+      "y": 464
+    },
+    {
+      "x": 560,
+      "y": 464
+    },
+    {
+      "x": 720,
+      "y": 464
+    },
+    {
+      "x": 880,
+      "y": 464
+    },
+    {
+      "x": 1040,
+      "y": 464
+    },
+    {
+      "x": 1200,
+      "y": 464
+    },
+    {
+      "x": 1360,
+      "y": 464
+    },
+    {
+      "x": 240,
+      "y": 536
+    },
+    {
+      "x": 400,
+      "y": 536
+    },
+    {
+      "x": 560,
+      "y": 536
+    },
+    {
+      "x": 720,
+      "y": 536
+    },
+    {
+      "x": 880,
+      "y": 536
+    },
+    {
+      "x": 1040,
+      "y": 536
+    },
+    {
+      "x": 1200,
+      "y": 536
+    },
+    {
+      "x": 1360,
+      "y": 536
+    },
+    {
+      "x": 240,
+      "y": 984
+    },
+    {
+      "x": 400,
+      "y": 984
+    },
+    {
+      "x": 560,
+      "y": 984
+    },
+    {
+      "x": 720,
+      "y": 984
+    },
+    {
+      "x": 880,
+      "y": 984
+    },
+    {
+      "x": 1040,
+      "y": 984
+    },
+    {
+      "x": 1200,
+      "y": 984
+    },
+    {
+      "x": 1360,
+      "y": 984
+    }
+  ]
+}
