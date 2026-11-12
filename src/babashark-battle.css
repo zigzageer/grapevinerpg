@@ -1,0 +1,445 @@
+.babashark-party {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 22%, #612985, #110b21 68%);
+  opacity: 0;
+  animation: babashark-blackout var(--impact-duration) ease-in-out both;
+}
+
+.babashark-disco {
+  display: grid;
+  position: absolute;
+  top: 15%;
+  left: 50%;
+  width: clamp(50px, 10vmin, 88px);
+  aspect-ratio: 1;
+  place-items: center;
+  transform: translateX(-50%);
+  border: 3px solid #e6b8fd;
+  border-radius: 50%;
+  background:
+    repeating-linear-gradient(90deg, transparent 0 12%, #381b5970 12% 15%),
+    repeating-linear-gradient(0deg, #d7c8ff 0 18%, #7453a0 18% 22%);
+  color: #fff1bb;
+  box-shadow: 0 0 35px #e4adffb8;
+}
+
+.babashark-disco svg {
+  width: 66%;
+  height: 66%;
+  filter: drop-shadow(2px 2px #51375e);
+}
+
+.babashark-sleep-mark {
+  position: absolute;
+  left: var(--target-x);
+  bottom: calc(var(--target-ground) + var(--battle-sprite-size) * 0.55);
+  display: flex;
+  align-items: center;
+  gap: 0.2em;
+  transform: translateX(-50%);
+  color: #f4dcff;
+  font:
+    600 clamp(19px, 4vmin, 38px) / 1 Fredoka,
+    sans-serif;
+  text-shadow: 2px 2px #25132e;
+  animation: babashark-sleep-mark var(--impact-duration) both;
+}
+
+.babashark-sleep-mark svg {
+  width: 0.8em;
+  height: 0.8em;
+  fill: #9a71bc;
+}
+
+.battle-fighter[data-motion="fall-asleep"] .duo-motion {
+  animation: babashark-fall-asleep var(--impact-duration) both;
+}
+
+@keyframes babashark-blackout {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  20% {
+    opacity: 0.58;
+  }
+  39% {
+    opacity: 0.93;
+  }
+  62%,
+  85% {
+    opacity: 0.2;
+  }
+}
+
+@keyframes babashark-fall-asleep {
+  0%,
+  35% {
+    transform: none;
+  }
+  55%,
+  89% {
+    transform: rotate(calc(var(--facing) * -67deg)) translateY(3%);
+  }
+  100% {
+    transform: none;
+  }
+}
+
+@keyframes babashark-sleep-mark {
+  0%,
+  49% {
+    opacity: 0;
+    transform: translate(-50%, 14px);
+  }
+  61%,
+  89% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -16px);
+  }
+}
+
+.battle-fighter[data-motion="kick-the-baby"] .duo-motion {
+  animation: babashark-kick var(--impact-duration) both;
+}
+
+.battle-fighter[data-motion="kick-the-baby"]
+  [data-companion="babashark-daughter"] {
+  visibility: hidden;
+}
+
+.babashark-kick-boot,
+.babashark-baby-flight {
+  position: absolute;
+  left: calc(
+    var(--source-x) + var(--direction) * var(--battle-sprite-size) * 0.26
+  );
+  bottom: calc(var(--source-ground) + var(--battle-sprite-size) * 0.045);
+}
+
+.babashark-kick-boot {
+  width: calc(var(--battle-sprite-size) * 0.58);
+  transform-origin: 42% 64%;
+  animation: babashark-kick-boot var(--impact-duration) both;
+}
+
+.babashark-baby-flight {
+  width: calc(var(--battle-sprite-size) * 0.224);
+  max-height: calc(var(--battle-sprite-size) * 0.36);
+  object-fit: contain;
+  animation: babashark-baby-flight var(--impact-duration) both;
+}
+
+@keyframes babashark-kick {
+  0%,
+  43%,
+  100% {
+    transform: none;
+  }
+  15% {
+    transform: rotate(calc(var(--facing) * -9deg));
+  }
+  25% {
+    transform: rotate(calc(var(--facing) * 9deg)) translateY(-5%);
+  }
+}
+
+@keyframes babashark-kick-boot {
+  0%,
+  15%,
+  41%,
+  100% {
+    opacity: 0;
+    transform: translate(-50%, 10%) scaleX(var(--direction)) rotate(45deg)
+      scale(0.6);
+  }
+  24%,
+  29% {
+    opacity: 1;
+    transform: translate(-50%, -30%) scaleX(var(--direction));
+  }
+}
+
+@keyframes babashark-baby-flight {
+  0%,
+  20%,
+  100% {
+    transform: translateX(-50%);
+  }
+  38% {
+    transform: translate(
+        calc(-50% + var(--direction) * var(--crossing) * 0.38),
+        calc(-0.6 * var(--battle-sprite-size))
+      )
+      rotate(calc(var(--direction) * 80deg));
+  }
+  58% {
+    transform: translate(
+        calc(
+          -50% + var(--direction) *
+            (var(--crossing) - var(--battle-sprite-size) * 0.3)
+        ),
+        calc(-0.13 * var(--battle-sprite-size))
+      )
+      rotate(calc(var(--direction) * 360deg));
+  }
+  77% {
+    transform: translate(
+      calc(-50% + var(--direction) * var(--crossing) * 0.45),
+      calc(-0.32 * var(--battle-sprite-size))
+    );
+  }
+  94% {
+    transform: translateX(-50%);
+  }
+}
+
+.babashark-simps {
+  position: absolute;
+  left: calc(
+    var(--source-x) + var(--direction) * var(--battle-sprite-size) * 0.68
+  );
+  bottom: var(--source-ground);
+  width: clamp(114px, calc(var(--battle-sprite-size) * 0.91), 260px);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: start;
+  text-align: center;
+  transform: translateX(-50%);
+  animation: babashark-simps var(--impact-duration) both;
+}
+
+.babashark-simps img {
+  grid-column: 1 / -1;
+  width: 100%;
+  transform: scaleX(var(--direction));
+  filter: drop-shadow(1px 2px #1b1622);
+}
+
+.battle-field[data-actor="opponent"] .babashark-simps span:last-child {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.babashark-simps span {
+  color: #f8e9c7;
+  font:
+    600 clamp(11px, 2.2vmin, 19px) / 1 Fredoka,
+    sans-serif;
+  text-shadow: 1px 2px #1a1423;
+}
+
+.babashark-cash {
+  position: absolute;
+  left: calc(
+    var(--source-x) + var(--direction) * var(--battle-sprite-size) * 0.69
+  );
+  bottom: calc(var(--source-ground) + var(--battle-sprite-size) * 0.38);
+  width: clamp(20px, 5vmin, 40px);
+  height: auto;
+  opacity: 0;
+  fill: #63a86c;
+  stroke: #e7ffad;
+  filter: drop-shadow(1px 2px #173d2b);
+  animation: babashark-cash 650ms ease-out calc(var(--impact-duration) * 0.38)
+    both;
+}
+
+.babashark-cash.second {
+  bottom: calc(var(--source-ground) + var(--battle-sprite-size) * 0.26);
+  animation-delay: calc(var(--impact-duration) * 0.38 + 100ms);
+}
+
+@keyframes babashark-simps {
+  0% {
+    transform: translate(calc(-50% + var(--direction) * 16vw), 10%);
+    opacity: 0;
+  }
+  22%,
+  80% {
+    transform: translateX(-50%);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, 12%);
+    opacity: 0;
+  }
+}
+
+@keyframes babashark-cash {
+  0% {
+    opacity: 0;
+    transform: rotate(12deg);
+  }
+  16%,
+  75% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(
+        calc(var(--direction) * var(--battle-sprite-size) * -0.65),
+        calc(var(--battle-sprite-size) * -0.27)
+      )
+      rotate(-25deg);
+  }
+}
+
+.battle-fighter[data-motion="chaz"] .duo-motion {
+  animation: babashark-hop-in var(--impact-duration) both;
+}
+
+.babashark-car {
+  position: absolute;
+  left: var(--source-x);
+  bottom: calc(var(--source-ground) - 1%);
+  width: clamp(164px, calc(var(--battle-sprite-size) * 1.72), 560px);
+  transform: translateX(-50%);
+  animation: babashark-drive-off var(--impact-duration) both;
+}
+
+.babashark-car-facing {
+  position: relative;
+  transform: scaleX(var(--direction));
+}
+
+.babashark-car-facing > img:first-child {
+  display: block;
+  width: 100%;
+  filter: drop-shadow(0 5px 2px #201b26a6);
+}
+
+.babashark-passenger,
+.babashark-car-baby {
+  position: absolute;
+  left: 19%;
+  bottom: 52%;
+  width: 18%;
+  height: 57%;
+  object-fit: contain;
+  opacity: 0;
+  animation: babashark-in-car var(--impact-duration) step-end both;
+}
+
+.babashark-car-baby {
+  left: 12%;
+  width: 10%;
+  height: 40%;
+  bottom: 50%;
+}
+
+.babashark-tire-smoke {
+  position: absolute;
+  bottom: 6%;
+  left: 2%;
+  width: 22%;
+  height: 26%;
+  opacity: 0;
+  animation: babashark-smoke var(--impact-duration) ease-out both;
+}
+
+.babashark-tire-smoke i {
+  position: absolute;
+  inset: 0 30% 0 0;
+  border-radius: 45% 55% 45% 45%;
+  background: #e2dae8;
+}
+
+.babashark-tire-smoke i:nth-child(2) {
+  inset: 18% 0 0 30%;
+}
+.babashark-tire-smoke i:nth-child(3) {
+  inset: 40% 53% 3% -21%;
+}
+
+@keyframes babashark-hop-in {
+  0%,
+  30%,
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+  38% {
+    opacity: 1;
+    transform: translateY(-18%);
+  }
+  48%,
+  94% {
+    opacity: 0;
+    transform: translateY(18%) scale(0.72);
+  }
+}
+
+@keyframes babashark-in-car {
+  0% {
+    opacity: 0;
+  }
+  44%,
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes babashark-drive-off {
+  0% {
+    transform: translateX(calc(-50% - var(--direction) * 65cqw));
+  }
+  25%,
+  44% {
+    transform: translateX(-50%);
+  }
+  71% {
+    transform: translateX(
+      calc(-50% + var(--direction) * var(--crossing) * 0.87)
+    );
+  }
+  100% {
+    transform: translateX(
+      calc(-50% + var(--direction) * (var(--crossing) + 62cqw))
+    );
+  }
+}
+
+@keyframes babashark-smoke {
+  0%,
+  47%,
+  100% {
+    opacity: 0;
+    transform: none;
+  }
+  58% {
+    opacity: 0.86;
+  }
+  80% {
+    opacity: 0.4;
+    transform: translateX(-65%) scale(1.7);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .babashark-party {
+    opacity: 0.22;
+  }
+  .battle-fighter[data-motion="fall-asleep"] .duo-motion {
+    transform: rotate(calc(var(--facing) * -30deg));
+  }
+  .babashark-kick-boot,
+  .babashark-baby-flight {
+    display: none;
+  }
+  .battle-fighter[data-motion="kick-the-baby"]
+    [data-companion="babashark-daughter"] {
+    visibility: visible;
+  }
+  .babashark-passenger,
+  .babashark-car-baby {
+    opacity: 1;
+  }
+  .babashark-car {
+    left: calc((var(--source-x) + var(--target-x)) / 2);
+  }
+}

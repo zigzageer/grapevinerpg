@@ -15,7 +15,9 @@ import {
   ArrowLeft,
   Armchair,
   Baby,
+  Banknote,
   Candy,
+  CarFront,
   CircleDot,
   CircleStop,
   Coffee,
@@ -29,6 +31,8 @@ import {
   GraduationCap,
   Heart,
   MessageCircleMore,
+  Moon,
+  PartyPopper,
   PawPrint,
   Sandwich,
   Shield,
@@ -47,16 +51,20 @@ import {
   createBattle,
   getMove,
   GOOD_WINDOW,
+  isBasicMove,
   MOVES,
   PERFECT_WINDOW,
   TIMING_DURATION,
   TIMING_TARGET,
   timingGrade,
+  type AbilityVisual,
+  type BasicMoveId,
   type BattleAction,
   type BattleEvent,
   type BattleState,
   type Fighter,
   type MoveId,
+  type SignatureMoveId,
   type Side,
   type TimingGrade,
 } from "../game/combat";
@@ -67,6 +75,7 @@ import {
   JAT,
   type Character,
 } from "../game/model";
+import { BabasharkEffects } from "./BabasharkEffects";
 import { CharacterArt } from "./Character";
 
 interface Props {
@@ -78,17 +87,27 @@ interface Props {
 }
 
 const IMPACT_DURATION = 850;
-const GRACE_DURATION = 1920;
-const TAG_TEAM_DURATION = 1430;
+const IMPACT_CUES: Partial<Record<AbilityVisual, readonly [number, number]>> = {
+  grace: [1920, 0.55],
+  "tag-team": [1430, 0.5],
+  "diddy-party": [1860, 0.48],
+  "kick-the-baby": [1720, 0.58],
+  "simps-assemble": [1700, 0.59],
+  chaz: [2150, 0.71],
+};
 const GENESIS = DEFAULT_CREW.find(
   (character) => character.preset === "genesis",
 )!;
 const REDUCED_MOTION = "(prefers-reduced-motion: reduce)";
 
-function impactDuration(event: BattleEvent | null) {
-  if (event?.visual === "grace") return GRACE_DURATION;
-  if (event?.visual === "tag-team") return TAG_TEAM_DURATION;
-  return IMPACT_DURATION;
+function affectsActor(event: BattleEvent) {
+  return (
+    event.move === "burn" ||
+    event.move === "stun" ||
+    event.move === "sleep" ||
+    event.move === "snack" ||
+    event.visual === "simps-assemble"
+  );
 }
 
 function Cutout({
@@ -220,6 +239,11 @@ function FighterStatus({
               <Zap size={12} /> Stunned
             </span>
           )}
+          {fighter.asleep && (
+            <span>
+              <Moon size={12} /> Asleep
+            </span>
+          )}
           {guarding && (
             <span>
               <Shield size={12} /> Braced
@@ -238,8 +262,8 @@ function stageMotion(
 ) {
   if (!event) return;
   if (event.actor !== side) {
-    if (event.damage <= 0 || event.move === "burn" || event.move === "stun")
-      return;
+    if (event.slept) return "fall-asleep";
+    if (event.damage <= 0 || affectsActor(event)) return;
     return side === "player" && event.grade !== "miss" ? "guard" : "hit";
   }
   const motion = event.visual ?? event.move;
@@ -285,6 +309,10 @@ function signatureIcon(
 ): LucideIcon {
   if (visual === "grace") return Heart;
   if (visual === "tag-team") return UsersRound;
+  if (visual === "diddy-party") return PartyPopper;
+  if (visual === "kick-the-baby") return Baby;
+  if (visual === "simps-assemble") return Banknote;
+  if (visual === "chaz") return CarFront;
   if (character.kind === "mint") return Candy;
   const preset =
     character.preset ??
@@ -301,11 +329,13 @@ function BattleEffects({
   crew?: Character[];
   source: Character;
 }) {
-  const self =
-    event.move === "burn" || event.move === "stun" || event.move === "snack";
+  const self = affectsActor(event);
   const hit = !self && event.damage > 0;
   const mirrored = event.actor === "opponent";
-  const blocked = hit && mirrored && event.grade !== "miss";
+  const blocked =
+    (hit || event.visual === "diddy-party") &&
+    mirrored &&
+    event.grade !== "miss";
   const grade =
     hit &&
     (mirrored
@@ -322,16 +352,16 @@ function BattleEffects({
     event.move === "snowball" ||
     event.move === "spark" ||
     event.visual === "projectile";
-  const EffectIcon =
-    event.move === "signature"
-      ? signatureIcon(source, event.visual)
-      : event.move === "snowball"
-        ? Snowflake
-        : Flame;
+  const EffectIcon = event.visual
+    ? signatureIcon(source, event.visual)
+    : event.move === "snowball"
+      ? Snowflake
+      : Flame;
   const impact =
     targetArt || event.visual === "burst" || event.visual === "rush";
   return (
     <div className="battle-effects">
+      <BabasharkEffects event={event} source={source} />
       {event.visual === "grace" && (
         <>
           <div className="battle-grace" data-guest="grace">
@@ -492,24 +522,36 @@ function Battlefield({
   );
 }
 
-const MOVE_ICONS: Record<Exclude<MoveId, "signature">, LucideIcon> = {
+const MOVE_ICONS: Record<BasicMoveId, LucideIcon> = {
   quick: Swords,
   heavy: Sword,
   snowball: Snowflake,
   spark: Flame,
   stomp: Footprints,
 };
-const COMMAND_MOVES = Object.keys(MOVES) as Exclude<MoveId, "signature">[];
+const COMMAND_MOVES = Object.keys(MOVES) as BasicMoveId[];
+
+type BattleCommandId = MoveId | "brace" | "snack" | "abilities" | "back";
+type WheelSlot = BasicMoveId | "signature" | "brace" | "snack";
+
+const SIGNATURE_SLOTS: Record<SignatureMoveId, WheelSlot> = {
+  signature: "signature",
+  "diddy-party": "signature",
+  "kick-the-baby": "heavy",
+  "simps-assemble": "spark",
+  chaz: "brace",
+};
 
 interface BattleCommand {
-  id: MoveId | "brace" | "snack";
+  id: BattleCommandId;
+  slot: WheelSlot;
   Icon: LucideIcon;
   name: string;
   description: string;
   detail: string;
   label: string;
   disabled: boolean;
-  action: BattleAction;
+  run: () => void;
   art?: string;
 }
 
@@ -522,38 +564,52 @@ function BattleCommands({
   dispatch: Dispatch<BattleAction>;
   actor: Character;
 }) {
-  const [selected, setSelected] = useState<MoveId | "brace" | "snack">("quick");
+  const [selected, setSelected] = useState<BattleCommandId>("quick");
+  const [showAbilities, setShowAbilities] = useState(false);
+  const { signatures } = battle.player;
   const first = useRef<HTMLButtonElement>(null);
-  useLayoutEffect(() => first.current?.focus({ preventScroll: true }), []);
+  useLayoutEffect(
+    () => first.current?.focus({ preventScroll: true }),
+    [showAbilities],
+  );
+
+  function changeWheel(show: boolean) {
+    setShowAbilities(show);
+    setSelected(show ? signatures[0].id : "abilities");
+  }
+
   const attackCommand = (id: MoveId): BattleCommand => {
     const move = getMove(battle.player, id)!;
+    const basic = isBasicMove(id);
     return {
       id,
-      Icon:
-        id === "signature" ? signatureIcon(actor, move.visual) : MOVE_ICONS[id],
+      slot: basic ? id : SIGNATURE_SLOTS[id],
+      Icon: basic ? MOVE_ICONS[id] : signatureIcon(actor, move.visual),
       name: move.name,
       description: move.description,
       detail: move.cost ? `${move.cost} PP` : "+1 PP",
       label: `Use ${move.name}`,
       disabled: battle.player.pp < move.cost,
-      action: { type: "choose", move: id },
+      run: () => dispatch({ type: "choose", move: id }),
       art: move.art,
     };
   };
-  const commands: BattleCommand[] = [
+  const mainCommands: BattleCommand[] = [
     ...COMMAND_MOVES.map(attackCommand),
     {
       id: "brace",
+      slot: "brace",
       Icon: Shield,
       name: "Brace",
       label: "Brace",
       description: "Reduce the next hit and recover power.",
       detail: "+2 PP",
       disabled: false,
-      action: { type: "brace" },
+      run: () => dispatch({ type: "brace" }),
     },
     {
       id: "snack",
+      slot: "snack",
       Icon: Sandwich,
       name: "Snack",
       label: "Eat a snack",
@@ -563,14 +619,55 @@ function BattleCommands({
         battle.itemUsed ||
         !battle.snacks ||
         battle.player.hp === battle.player.maxHp,
-      action: { type: "snack" },
+      run: () => dispatch({ type: "snack" }),
     },
   ];
-  if (battle.player.signature) commands.push(attackCommand("signature"));
+  if (signatures.length === 1)
+    mainCommands.push(attackCommand(signatures[0].id));
+  if (signatures.length > 1) {
+    mainCommands.push({
+      id: "abilities",
+      slot: "signature",
+      Icon: Sparkles,
+      name: "Abilities",
+      label: "Abilities",
+      description: "Open the wheel for this fighter’s signature moves.",
+      detail: `${signatures.length} moves`,
+      disabled: false,
+      run: () => changeWheel(true),
+    });
+  }
+  const commands: BattleCommand[] = showAbilities
+    ? [
+        ...signatures.map(({ id }) => attackCommand(id)),
+        {
+          id: "back",
+          slot: "snack",
+          Icon: ArrowLeft,
+          name: "Back",
+          label: "Back to battle actions",
+          description: "Return to the main battle wheel.",
+          detail: "",
+          disabled: false,
+          run: () => changeWheel(false),
+        },
+      ]
+    : mainCommands;
   const focused =
     commands.find((command) => command.id === selected) ?? commands[0];
+  const focusId = showAbilities
+    ? commands.find((command) => !command.disabled)?.id
+    : selected === "abilities"
+      ? "abilities"
+      : "quick";
 
   function moveFocus(event: ReactKeyboardEvent<HTMLDivElement>) {
+    if (event.key === "Escape" && showAbilities) {
+      event.preventDefault();
+      event.stopPropagation();
+      changeWheel(false);
+      return;
+    }
     if (
       !["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)
     )
@@ -599,39 +696,40 @@ function BattleCommands({
       <div
         className="battle-moves"
         role="group"
-        aria-label="Battle actions"
+        aria-label={showAbilities ? "Signature abilities" : "Battle actions"}
         onKeyDown={moveFocus}
       >
         {commands.map(
           ({
             id,
+            slot,
             Icon,
             name,
             detail,
             label,
             description,
             disabled,
-            action,
+            run,
             art,
           }) => (
             <button
               key={id}
-              ref={id === "quick" ? first : undefined}
+              ref={id === focusId ? first : undefined}
               className="battle-move"
-              data-command={id}
+              data-command={slot}
               data-highlight={selected === id || undefined}
               aria-label={label}
               aria-describedby={`battle-command-${id}`}
               disabled={disabled}
               onFocus={() => setSelected(id)}
               onPointerEnter={() => setSelected(id)}
-              onClick={() => dispatch(action)}
+              onClick={run}
             >
               <span className="battle-command-token" aria-hidden="true">
                 {art ? <Art src={art} fallback={<Icon />} /> : <Icon />}
               </span>
               <strong>{name}</strong>
-              <small>{detail}</small>
+              {detail && <small>{detail}</small>}
               <span className="battle-sr-only" id={`battle-command-${id}`}>
                 {description} {detail}.
               </span>
@@ -765,21 +863,23 @@ export function Battle({ actor, other, crew, onBack, onClose }: Props) {
   const defending = battle.phase === "block";
   const timing = battle.phase === "attack" || defending;
   const lingeringEvent =
-    battle.event && ["snack", "burn", "stun"].includes(battle.event.move);
+    battle.event &&
+    ["snack", "burn", "stun", "sleep"].includes(battle.event.move);
   const activeEvent =
     battle.phase === "impact" || (!finished && lingeringEvent)
       ? battle.event
       : null;
   const damage = battle.phase === "impact" ? (activeEvent?.damage ?? 0) : 0;
   const struck =
-    damage > 0 && (activeEvent?.actor === "player" ? "opponent" : "player");
-  const duration = impactDuration(activeEvent);
-  const impactAt =
-    activeEvent?.visual === "grace"
-      ? 0.55
-      : activeEvent?.visual === "tag-team"
-        ? 0.5
-        : 0.38;
+    activeEvent &&
+    damage &&
+    (affectsActor(activeEvent)
+      ? activeEvent.actor
+      : activeEvent.actor === "player"
+        ? "opponent"
+        : "player");
+  const [duration, impactAt] = (activeEvent?.visual &&
+    IMPACT_CUES[activeEvent.visual]) ?? [IMPACT_DURATION, 0.38];
   const attack = getMove(
     defending ? battle.opponent : battle.player,
     battle.move,
@@ -790,9 +890,10 @@ export function Battle({ actor, other, crew, onBack, onClose }: Props) {
   const result =
     battle.phase === "victory" ? `${actor.name} wins!` : `${other.name} wins!`;
   const abilityTitle =
-    activeEvent?.move === "signature"
-      ? getMove(battle[activeEvent.actor], "signature")?.name
-      : undefined;
+    activeEvent &&
+    battle[activeEvent.actor].signatures.find(
+      ({ id }) => id === activeEvent.move,
+    )?.name;
 
   useLayoutEffect(() => {
     const element = dialog.current;

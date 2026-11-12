@@ -6,6 +6,11 @@ export const ADDITIONAL_BIOS: Partial<
     { title: string; description: string }
   >
 > = {
+  babashark: {
+    title: "Here comes the officer.",
+    description:
+      "babashark wears an olive officer uniform and peaked cap. Her little daughter in a pink snowsuit comes along everywhere.",
+  },
   "red-light": {
     title: "Always watching.",
     description: "Red Light is a fuzzy brown creature with enormous eyes.",

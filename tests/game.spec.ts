@@ -456,6 +456,90 @@ test("David calls Grace for the kiss and the CUCK hit", async ({ page }) => {
   await expect(stage.locator(".battle-sparks i")).toHaveCount(3);
 });
 
+test("babashark brings her daughter and can use all four abilities", async ({
+  page,
+}) => {
+  const time = new Date("2026-11-11T12:00:00Z");
+  await page.clock.install({ time });
+  await page.goto("/");
+  await page
+    .getByRole("button", { name: "Play as babashark", exact: true })
+    .click();
+  const sprite = page.getByTestId("player-sprite");
+  await expect(
+    sprite.locator('image[href="/characters/babashark.png"]'),
+  ).toBeVisible();
+  await expect(
+    sprite.locator('[data-companion="babashark-daughter"]'),
+  ).toHaveAttribute("href", "/abilities/babashark-daughter.webp");
+  await page.clock.pauseAt(new Date(time.getTime() + 60_000));
+
+  const moves = [
+    ["Diddy Party", "diddy-party"],
+    ["Kick the Baby", "kick-the-baby"],
+    ["SIMPs Assemble", "simps-assemble"],
+    ["Chaz", "chaz"],
+  ] as const;
+  for (const [name, visual] of moves) {
+    await page
+      .getByRole("button", { name: "Interact with Sarina", exact: true })
+      .click();
+    await page.getByRole("button", { name: "Fight", exact: true }).click();
+    const battle = page.getByTestId("battle");
+    const abilities = battle.getByRole("button", {
+      name: "Abilities",
+      exact: true,
+    });
+    await abilities.click();
+    const wheel = battle.getByRole("group", { name: "Signature abilities" });
+    await expect(wheel.getByRole("button")).toHaveCount(5);
+    if (visual === "diddy-party") {
+      await page.keyboard.press("Escape");
+      await expect(abilities).toBeFocused();
+      await abilities.click();
+    }
+    await wheel
+      .getByRole("button", { name: `Use ${name}`, exact: true })
+      .click();
+    await perfectTiming(page);
+    const stage = battle.locator(`.duo-stage[data-visual="${visual}"]`);
+    await expect(stage).toBeVisible();
+    if (visual === "diddy-party") {
+      await expect(stage.locator(".babashark-sleep-mark")).toContainText("Zzz");
+      await expect(battle.locator(".fighter-status.opponent")).toContainText(
+        "Asleep",
+      );
+      await page.clock.runFor(1860);
+      await expect(battle).toHaveAttribute("data-phase", "choose");
+      await expect(battle.getByRole("status")).toContainText(
+        "sleeps through a turn",
+      );
+    } else if (visual === "kick-the-baby") {
+      await expect(stage.locator(".babashark-baby-flight")).toHaveAttribute(
+        "src",
+        "/abilities/babashark-daughter.webp",
+      );
+    } else if (visual === "simps-assemble") {
+      await expect(stage.locator(".babashark-simps")).toContainText("Haku");
+      await expect(stage.locator(".babashark-simps")).toContainText(
+        "bellyache",
+      );
+    } else {
+      await expect(
+        stage.locator(
+          '.babashark-car img[src="/abilities/chaz-corvette.webp"]',
+        ),
+      ).toBeAttached();
+      await expect(
+        stage.locator(".babashark-passenger image").first(),
+      ).toHaveAttribute("href", "/characters/babashark.png");
+    }
+    await battle
+      .getByRole("button", { name: "Leave fight", exact: true })
+      .click();
+  }
+});
+
 test("Orrow chatters at rest and kawaiikitty rolls without a walking hop", async ({
   page,
 }) => {

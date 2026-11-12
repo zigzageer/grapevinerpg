@@ -121,3 +121,37 @@ The generated cutout and David’s revised sprite guided the proportions pass.
 ```text
 Use case: paper-cutout style-transfer edit. Image 1 is kawaiikitty, the edit target. Image 2 is a reference only for classic South Park eyes and proportions. Keep a Black girl with the same deep brown skin, twin dark ponytails and pink ribbons, and pink Jirai Kei blouse with a black bow, ruffled pink and black skirt, black socks and pink Mary Janes. She is always sitting in her pink gaming chair, with the full chair, tall pink back, armrests, center column, foot support, and three visible black caster wheels all included. Redraw unmistakably like a classic South Park TV game character. Large round paper face, enormous adjacent white oval eyes with little black dot pupils, tiny line smile, stocky short upper body, small paper mitten hands and stubby legs. Make her round head visually dominant even while seated. Simplify the skirt and chair into flat matte paper shapes with sparse trim. Use a mostly front-facing pose angled a little right, just as before. Keep every wheel and the whole chair and head in frame. Genuine transparent alpha with hard edges, no halo, light effects, ground, room, text, or logo.
 ```
+
+## babashark
+
+`public/characters/babashark.png`
+
+```text
+Use case: a new full-body flat paper-cutout playable character sprite for the Adventures of Mint game. Draw babashark, an adult brown-skinned woman with warm medium-brown skin, black choppy side-swept bob hair and one longer lock on the viewer’s right tied with a little gold cuff. Bright white overlapping oval eyes and tiny dark pupils, very big nearly circular head, quiet smile, short simplified body and mitten hands. She wears a fictional mountain-town officer uniform. Olive-green peaked cap tilted gently to one side with a plain black visor and thin silver braid along the front band. The cap is completely blank above the braid. Matching olive-green buttoned tunic with a high charcoal collar, simple shoulder boards, narrow gray piping and four plain round silver buttons. Straight charcoal trousers and tall black leather boots. No emblems or decorations beyond the piping and buttons. Use the unmistakable flat, deliberately simple proportions of classic South Park game cutouts, solid matte colored paper, hard-edged simple shapes, sparse texture, no sculpted shading. Frontal standing pose with arms relaxed, show the whole hat and both boots and center with small margins. One adult character, genuine transparent alpha. No text, insignia, backdrop, props, weapon, floor, glow or shadow.
+```
+
+## babashark’s daughter
+
+`public/abilities/babashark-daughter.webp`
+
+The daughter’s proportions draw from Ike. [South Park Studios](https://southpark.cc.com/news/jq11qy/best-of-ike)
+
+```text
+Create one original toddler girl companion cutout sprite for the Adventures of Mint paper cutout game. Echo Ike Broflovski’s distinctive South Park toddler proportions: gigantic almost egg-shaped peach face, little dark tufts of hair on top, two simple adjacent white oval eyes with tiny dot pupils, a separate rounded paper chin underneath a simple horizontal smile, and very small feet. Give this original girl a tiny coral pink bow clipped off-center, a coral pink winter onesie with a simple pale zipper stripe, mitten hands, and little teal snow boots. Front-facing cheerful standing pose. The egg-shaped head occupies most of her tiny height and is noticeably taller than her miniature body. Flat solid matte construction-paper pieces, sharp simple outline, no gradients or realistic lighting. Full sprite completely in frame, neutral, single character on a genuine transparent alpha background. No surroundings, other characters, objects, floor, text, badge, watermark, glow or cast shadow.
+```
+
+## Haku and bellyache
+
+`public/abilities/simps-assemble.webp`
+
+```text
+Create a single game effect cutout containing two adult men kneeling side by side and holding up cartoon stacks of green bills as gifts. For an Adventures of Mint side-on turn-based RPG summon. Haku is on the left, pale tan with short black swept hair, navy hoodie and gray pants. Bellyache is on the right, warm fair skin with a brick-orange cap, plaid shirt and dark blue pants. Both face slightly toward viewer left and toward the camera, one knee on ground with a bent forward leg, each cheerfully holds one stack out in front. Keep the silhouettes easy to distinguish at small game size. Classic South Park paper animation proportions, giant round faces with simple adjacent oval white eyes and tiny pupils, short limbs, flat colors and hard-edged paper cutouts, matte texture. One two-person group centered, no other characters, entire heads, knees, hands and the stacks of cash inside. Real transparent alpha, no letters, captions, numbers, currency symbols, backdrop, floor, gradients, shadow, or watermark.
+```
+
+## Chaz and his Corvette
+
+`public/abilities/chaz-corvette.webp`
+
+```text
+Draw one whole side-view cutout of a bright cherry-red late-model Corvette-style open-top sports car pointing to the viewer’s right, with its driver Chaz visible in the cockpit. Game summon sprite for Adventures of Mint. Distinctively low wedge nose and Corvette proportions, open roof, two visible simple black wheels, cream windshield reflection, no text or badges. Chaz is a handsome adult male, meme-inspired Chad with strong square jaw and cheekbones, but a feminine styling with long flowing dark hair, visibly full rosy lips, winged eyeliner, and a small black choker. His head and upper shoulders project clearly above the car door so his face is readable, one hand at the steering wheel, passenger seat empty. Render both car and driver in classic South Park TV flat paper cutout style, oversized almost circular head with close white oval eyes, construction-paper matte colors, flat clean silhouette and bold shape breaks, no photoreal reflections. All of the bumper, wheels, and hair fully inside the canvas. Genuine transparent alpha around the single car and its driver, no road, smoke, speed lines, drop shadow, text, extra people, logo or background.
+```

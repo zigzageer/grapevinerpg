@@ -1,4 +1,4 @@
-import type { Move } from "./combat";
+import type { Move, SignatureMove } from "./combat";
 import {
   DEFAULT_CREW,
   normalizeGeneratedAbility,
@@ -16,7 +16,10 @@ const PEPPERMINT_POP: Move = {
   armor: 0.25,
 };
 
-const CAST_ABILITIES: Record<NonNullable<Character["preset"]>, Move> = {
+const CAST_ABILITIES: Record<
+  Exclude<NonNullable<Character["preset"]>, "babashark">,
+  Move
+> = {
   "baguette-guy": {
     name: "Stale Baguette",
     description: "A swing with yesterday’s baguette that ignores armor.",
@@ -246,6 +249,51 @@ const CAST_ABILITIES: Record<NonNullable<Character["preset"]>, Move> = {
   },
 };
 
+const BABASHARK_MOVES: readonly SignatureMove[] = [
+  {
+    id: "diddy-party",
+    name: "Diddy Party",
+    description: "A timed blackout puts your opponent to sleep for one turn.",
+    visual: "diddy-party",
+    effect: "sleep",
+    cost: 4,
+    damage: 0,
+    hits: 1,
+    armor: 0,
+  },
+  {
+    id: "kick-the-baby",
+    name: "Kick the Baby",
+    description: "Her daughter bounces off the opponent and pops right back up.",
+    visual: "kick-the-baby",
+    cost: 3,
+    damage: 27,
+    hits: 1,
+    armor: 0.5,
+  },
+  {
+    id: "simps-assemble",
+    name: "SIMPs Assemble",
+    description: "Haku and bellyache pay up. Good timing heals 24 HP.",
+    visual: "simps-assemble",
+    restore: 24,
+    cost: 2,
+    damage: 0,
+    hits: 1,
+    armor: 0,
+  },
+  {
+    id: "chaz",
+    name: "Chaz",
+    description: "Chaz picks her up in his Corvette and peels out.",
+    visual: "chaz",
+    cost: 4,
+    damage: 34,
+    hits: 1,
+    armor: 0.25,
+  },
+];
+
 const castPresetsById = new Map(
   DEFAULT_CREW.map(({ id, preset }) => [id, preset]),
 );
@@ -259,14 +307,30 @@ const GENERATED_RULES: Record<
   rush: { cost: 3, damage: 16, hits: 2, armor: 0.75 },
 };
 
-export function getSignatureMove(character: Character): Move | undefined {
+export function getSignatureMoves(
+  character: Character,
+): readonly SignatureMove[] {
   const ability = normalizeGeneratedAbility(character.ability);
   if (ability) {
     const { name, description, art, style } = ability;
-    return { ...GENERATED_RULES[style], name, description, art, visual: style };
+    return [
+      {
+        ...GENERATED_RULES[style],
+        id: "signature",
+        name,
+        description,
+        art,
+        visual: style,
+      },
+    ];
   }
   // Old roster migrations assigned some built-ins a different ID but kept their preset.
   const preset = character.preset ?? castPresetsById.get(character.id);
-  if (preset) return CAST_ABILITIES[preset];
-  if (character.kind === "mint") return PEPPERMINT_POP;
+  if (preset === "babashark") return BABASHARK_MOVES;
+  const move = preset
+    ? CAST_ABILITIES[preset]
+    : character.kind === "mint"
+      ? PEPPERMINT_POP
+      : undefined;
+  return move ? [{ ...move, id: "signature" }] : [];
 }

@@ -48,11 +48,12 @@ export interface Character {
     | "bashu"
     | "orrow"
     | "potato"
-    | "kawaiikitty";
+    | "kawaiikitty"
+    | "babashark";
 }
 export interface SaveGame {
   version: 1;
-  castVersion: 10;
+  castVersion: 11;
   activeCharacter?: string;
   tvLook?: boolean;
   player: Point;
@@ -409,6 +410,20 @@ export const CAST_VERSION_10_ADDITIONS: Character[] = [
     glasses: false,
   },
 ];
+export const BABASHARK: Character = {
+  id: "cast-babashark",
+  name: "babashark",
+  kind: "human",
+  preset: "babashark",
+  skin: "#a6704d",
+  hair: "messy",
+  hairColor: "#242126",
+  shirt: "#53573e",
+  pants: "#303036",
+  hat: "cap",
+  hatColor: "#53573e",
+  glasses: false,
+};
 export const characterKey = (c: Character) => c.id;
 export const characterScale = (c: Character) =>
   c.heightScale ?? (c.preset === "blindian" ? 1.45 : 1);
@@ -460,6 +475,7 @@ export const DEFAULT_CREW: Character[] = [
   GRACE,
   TOMMY,
   ...CAST_VERSION_10_ADDITIONS,
+  BABASHARK,
 ];
 const castPresets = new Set<string>(
   DEFAULT_CREW.flatMap(({ preset }) => (preset ? [preset] : [])),
@@ -467,7 +483,7 @@ const castPresets = new Set<string>(
 
 export const initialSave = (): SaveGame => ({
   version: 1,
-  castVersion: 10,
+  castVersion: 11,
   tvLook: true,
   player: { ...START },
   crew: DEFAULT_CREW.map((c) => ({ ...c })),
@@ -694,11 +710,12 @@ export function loadSave(): SaveGame {
           crew.push({ ...character, id: `friend-${crew.length}` });
       }
     }
-    if (previousCastVersion < 10) {
+    if (previousCastVersion < 11) {
       const additions = [
         ...(previousCastVersion < 8 ? CAST_ADDITIONS : []),
         ...(previousCastVersion < 9 ? [GRACE, TOMMY] : []),
-        ...CAST_VERSION_10_ADDITIONS,
+        ...(previousCastVersion < 10 ? CAST_VERSION_10_ADDITIONS : []),
+        BABASHARK,
       ];
       for (const character of additions) {
         if (
@@ -722,7 +739,7 @@ export function loadSave(): SaveGame {
         : { ...START };
     return {
       version: 1,
-      castVersion: 10,
+      castVersion: 11,
       tvLook: raw.tvLook !== false,
       activeCharacter:
         typeof raw.activeCharacter === "string"

@@ -9,6 +9,7 @@ import {
   normalizeCharacter,
   characterScale,
   CAST_ADDITIONS,
+  BABASHARK,
   CAST_VERSION_10_ADDITIONS,
   GRACE,
   MINT_CREW_LIMIT,
@@ -148,16 +149,17 @@ describe("cast updates and saved characters", () => {
         "orrow",
         "potato",
         "kawaiikitty",
+        "babashark",
       ]);
       expect(migrated.crew[1].name).toBe("Sam");
       expect(migrated).toMatchObject({
         greeted: true,
         inspected: true,
         player: { x: 720, y: 560 },
-        castVersion: 10,
+        castVersion: 11,
       });
       data = JSON.stringify(migrated);
-      expect(loadSave().crew).toHaveLength(27);
+      expect(loadSave().crew).toHaveLength(28);
       // Replacing the imported cast intentionally must not re-add removed characters on every reload.
       data = JSON.stringify({ ...migrated, crew: migrated.crew.slice(0, 3) });
       expect(loadSave().crew).toHaveLength(3);
@@ -178,7 +180,7 @@ describe("cast updates and saved characters", () => {
     });
     try {
       const migrated = loadSave();
-      expect(migrated.crew).toHaveLength(27);
+      expect(migrated.crew).toHaveLength(28);
       expect(migrated.crew[3]).toMatchObject({
         name: "Sammy",
         preset: "baguette-guy",
@@ -203,13 +205,14 @@ describe("cast updates and saved characters", () => {
   });
 });
 
-it.each([8, 9])(
-  "expands a full version %i save without replacing characters",
+it.each([8, 9, 10])(
+  "expands a version %i save without replacing characters",
   (castVersion) => {
-    const additions =
-      castVersion === 8
-        ? [GRACE, TOMMY, ...CAST_VERSION_10_ADDITIONS]
-        : CAST_VERSION_10_ADDITIONS;
+    const additions = [
+      ...(castVersion < 9 ? [GRACE, TOMMY] : []),
+      ...(castVersion < 10 ? CAST_VERSION_10_ADDITIONS : []),
+      BABASHARK,
+    ];
     const addedIds = new Set(additions.map((character) => character.id));
     const crew = DEFAULT_CREW.filter(
       (character) => !addedIds.has(character.id),
@@ -235,7 +238,7 @@ it.each([8, 9])(
     try {
       const migrated = loadSave();
       expect(migrated).toMatchObject({
-        castVersion: 10,
+        castVersion: 11,
         activeCharacter: previous.activeCharacter,
         player: previous.player,
       });
@@ -243,7 +246,7 @@ it.each([8, 9])(
         migrated.crew.filter((character) => addedIds.has(character.id)),
       ).toMatchObject(additions);
       expect(migrated.crew.slice(0, crew.length)).toMatchObject(crew);
-      expect(migrated.crew).toHaveLength(24 + additions.length);
+      expect(migrated.crew).toHaveLength(crew.length + additions.length);
       data = JSON.stringify(migrated);
       expect(loadSave().crew).toMatchObject(migrated.crew);
     } finally {

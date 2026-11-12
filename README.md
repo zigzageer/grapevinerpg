@@ -4,7 +4,7 @@
 
 A full-screen 2D browser game starring Mint and the whole cast. Choose a character on your first visit, then start walking. The game remembers your choice on this device. The world fills the display; character selection, controls, and editing live in in-game overlays. This free-roam demo has no story or quests yet.
 
-Click a cast member in town to **Fight**, **Kiss**, or **Play as** them. Duels take over the screen with a side-on street arena, HP and PP bars, and circular move buttons around the active fighter on wide screens. Each built-in character has a signature move. David calls Grace for a kiss and a randomly sized combo, and blindian calls Jat and Genesis for a two-hit tag team. Tap **Strike!** or **Block!**, or press Space, when the timing marker reaches green. Gold gives perfect timing. Armor, burning, stun, bracing, and two snacks per fight are available, and HP and PP refill each duel. The combat is inspired by [The Stick of Truth](https://primagames.com/eguides/south-park-the-stick-of-truth-eguide/how-not-to-get-screwed/how-not-to-get-screwed). See [combat art and prompts](docs/combat-art.md).
+Click a cast member in town to **Fight**, **Kiss**, or **Play as** them. Duels take over the screen with a side-on street arena, HP and PP bars, and circular move buttons around the active fighter on wide screens. Built-in characters have signature moves. David calls Grace for a kiss and a randomly sized combo, and blindian calls Jat and Genesis for a two-hit tag team. babashark’s **Abilities** wheel includes Diddy Party, Kick the Baby, SIMPs Assemble, and Chaz. Tap **Strike!** or **Block!**, or press Space, when the timing marker reaches green. Gold gives perfect timing. Armor, burning, stun, sleep, bracing, and two snacks per fight are available, and HP and PP refill each duel. The combat is inspired by [The Stick of Truth](https://primagames.com/eguides/south-park-the-stick-of-truth-eguide/how-not-to-get-screwed/how-not-to-get-screwed). See [combat art and prompts](docs/combat-art.md).
 
 Each Discord server can have its own empty town and cast. The `/game create` and `/game add` bot modules use the VPS Codex CLI and its saved ChatGPT login to generate characters from server nicknames, avatars, descriptions, and uploaded references. The bot publishes its roster and artwork through GitHub and Vercel. See [bot integration and setup](docs/discord-games.md).
 
@@ -39,7 +39,7 @@ The **TV episode look** is on by default: color grading, paper grain, fine broad
 
 ## Cast & workshop
 
-The main game has 25 playable cast members. Grace, Tommy, Red Light, Peaches, Lin, Bashu, Orrow, Potato, and kawaiikitty join the original cast. Orrow chatters while standing and moving, and kawaiikitty rolls around in her gaming chair. The Mint workshop supports up to 40 characters and retains customized friends from older saves. Discord towns support up to 24.
+The main game has 26 playable cast members. babashark wears an olive officer uniform and travels with her daughter. Orrow chatters while standing and moving, and kawaiikitty rolls around in her gaming chair. The Mint workshop supports up to 40 characters and retains customized friends from older saves. Discord towns support up to 24.
 
 Open **Pause → Character workshop** or the workshop button in the picker to edit names, upload transparent PNG/WebP sprites (under 1 MB), or export/import the crew. Restore a standard cutout to edit individual appearance traits. Generated character sprites have a fixed appearance.
 

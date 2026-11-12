@@ -1,5 +1,5 @@
 import { useId } from "react";
-import { characterArtUrl } from "../game/art";
+import { abilityArtUrl, characterArtUrl } from "../game/art";
 import type { Character as CharacterData } from "../game/model";
 import { characterScale } from "../game/model";
 
@@ -152,6 +152,17 @@ function CharacterCutout({
           image
         )}
         {!c.sprite && c.preset === "orrow" && <OrrowMouth />}
+        {!c.sprite && c.preset === "babashark" && (
+          <image
+            data-companion="babashark-daughter"
+            href={abilityArtUrl("babashark-daughter")}
+            x="104"
+            y="109"
+            width="44"
+            height="71"
+            preserveAspectRatio="xMidYMax meet"
+          />
+        )}
         {rolling && <ChairRoll facing={facing} />}
       </g>
     );

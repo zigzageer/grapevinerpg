@@ -1,13 +1,23 @@
-import { getSignatureMove } from "./abilities";
+import { getSignatureMoves } from "./abilities";
 import type { Character } from "./model";
 
 export type Side = "player" | "opponent";
 export type TimingGrade = "perfect" | "good" | "miss";
 export type BasicMoveId = "quick" | "heavy" | "snowball" | "spark" | "stomp";
-export type MoveId = BasicMoveId | "signature";
+export type SignatureMoveId =
+  | "signature"
+  | "diddy-party"
+  | "kick-the-baby"
+  | "simps-assemble"
+  | "chaz";
+export type MoveId = BasicMoveId | SignatureMoveId;
 export type AbilityVisual =
   | "grace"
   | "tag-team"
+  | "diddy-party"
+  | "kick-the-baby"
+  | "simps-assemble"
+  | "chaz"
   | "burst"
   | "projectile"
   | "rush";
@@ -19,10 +29,15 @@ export interface Move {
   damage: number;
   hits: number | readonly [min: number, max: number];
   armor: number;
-  effect?: "burn" | "stun";
+  effect?: "burn" | "stun" | "sleep";
+  restore?: number;
   visual?: AbilityVisual;
   art?: string;
   tag?: string;
+}
+
+export interface SignatureMove extends Move {
+  id: SignatureMoveId;
 }
 
 export const MOVES: Record<BasicMoveId, Move> = {
@@ -79,16 +94,23 @@ export interface Fighter {
   armor: number;
   burning: number;
   stunned: boolean;
-  signature?: Move;
+  asleep: boolean;
+  signatures: readonly SignatureMove[];
+}
+
+export function isBasicMove(id: string): id is BasicMoveId {
+  return Object.hasOwn(MOVES, id);
 }
 
 export function getMove(fighter: Fighter, id: MoveId): Move | undefined {
-  return id === "signature" ? fighter.signature : MOVES[id];
+  return isBasicMove(id)
+    ? MOVES[id]
+    : fighter.signatures.find((move) => move.id === id);
 }
 
 export interface BattleEvent {
   actor: Side;
-  move: MoveId | "brace" | "snack" | "burn" | "stun";
+  move: MoveId | "brace" | "snack" | "burn" | "stun" | "sleep";
   grade: TimingGrade;
   damage: number;
   text: string;
@@ -96,6 +118,7 @@ export interface BattleEvent {
   visual?: AbilityVisual;
   art?: string;
   tag?: string;
+  slept?: boolean;
 }
 
 export interface BattleState {
@@ -143,8 +166,9 @@ export function createBattle(
     armor: 3,
     burning: 0,
     stunned: false,
-    signature:
-      typeof character === "string" ? undefined : getSignatureMove(character),
+    asleep: false,
+    signatures:
+      typeof character === "string" ? [] : getSignatureMoves(character),
   });
   return {
     player: fighter(player, 100),
@@ -183,14 +207,15 @@ function beginTurn(state: BattleState, side: Side): BattleState {
   }
   if (next[side].hp === 0)
     return { ...next, phase: side === "player" ? "defeat" : "victory" };
-  if (fighter.stunned) {
+  if (fighter.stunned || fighter.asleep) {
     next[side].stunned = false;
+    next[side].asleep = false;
     next.event = {
       actor: side,
-      move: "stun",
+      move: fighter.asleep ? "sleep" : "stun",
       grade: "perfect",
       damage,
-      text: `${fighter.name} is stunned and misses a turn.${damage ? ` Burning deals ${damage} damage.` : ""}`,
+      text: `${fighter.name} ${fighter.asleep ? "sleeps through a turn" : "is stunned and misses a turn"}.${damage ? ` Burning deals ${damage} damage.` : ""}`,
     };
     next.eventId++;
     if (side === "player") next.round++;
@@ -207,9 +232,13 @@ function beginTurn(state: BattleState, side: Side): BattleState {
     };
   const pattern = ["quick", "heavy", "spark"] as const;
   const planned = pattern[(state.round - 1) % pattern.length];
-  const { pp, signature } = next.opponent;
+  const { pp, signatures } = next.opponent;
+  const attacks = signatures.filter((move) => !move.restore);
+  const signature = attacks.length
+    ? attacks[Math.floor((state.round - 1) / pattern.length) % attacks.length]
+    : undefined;
   if (planned === "spark" && signature && pp >= signature.cost) {
-    next.move = "signature";
+    next.move = signature.id;
     next.opponent.pp -= signature.cost;
   } else {
     next.move = pp >= MOVES[planned].cost ? planned : "quick";
@@ -241,7 +270,7 @@ function resolveTiming(
     side === "player" ? 1 : { perfect: 0.2, good: 0.5, miss: 1 }[grade];
   const guardMultiplier = side === "opponent" && state.guarding ? 0.55 : 1;
   const perHit = Math.max(
-    1,
+    move.damage ? 1 : 0,
     Math.round(
       (move.damage * attackMultiplier - state[other].armor * move.armor) *
         blockMultiplier *
@@ -257,10 +286,17 @@ function resolveTiming(
   const stuns =
     move.effect === "stun" &&
     grade === (side === "player" ? "perfect" : "miss");
+  const sleeps = move.effect === "sleep" && appliesEffect;
   const tag = appliesEffect ? move.tag : undefined;
   if (burns) target.burning = 2;
   if (stuns) target.stunned = true;
+  if (sleeps) target.asleep = true;
   const attacker = { ...state[side] };
+  const healed = Math.min(
+    attacker.maxHp - attacker.hp,
+    Math.round((move.restore ?? 0) * attackMultiplier),
+  );
+  attacker.hp += healed;
   if (!move.cost) attacker.pp = Math.min(attacker.maxPp, attacker.pp + 1);
   if (side === "opponent" && grade === "perfect")
     target.pp = Math.min(target.maxPp, target.pp + 1);
@@ -271,10 +307,16 @@ function resolveTiming(
           grade
         ];
   const hitCount = hits > 1 ? ` across ${hits} hits` : "";
+  const result = move.restore
+    ? ` and restores ${healed} HP`
+    : damage
+      ? ` for ${damage} damage${hitCount}`
+      : "";
   const text = [
-    `${feedback} ${attacker.name} uses ${move.name} for ${damage} damage${hitCount}.`,
+    `${feedback} ${attacker.name} uses ${move.name}${result}.`,
     burns && `${target.name} is burning.`,
     stuns && `${target.name} is stunned.`,
+    sleeps && `${target.name} blacks out and falls asleep.`,
     tag && `${target.name} is tagged ${tag}.`,
   ]
     .filter(Boolean)
@@ -289,11 +331,12 @@ function resolveTiming(
       actor: side,
       move: state.move,
       grade,
-      damage,
+      damage: healed ? -healed : damage,
       hits,
       visual: move.visual,
       art: move.art,
       tag,
+      slept: sleeps || undefined,
       text,
     },
   };

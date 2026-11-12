@@ -7,7 +7,13 @@ import {
   type BattleState,
   type MoveId,
 } from "./combat";
-import { CAST_ADDITIONS, DAVID, DEFAULT_CREW, parseCrew } from "./model";
+import {
+  BABASHARK,
+  CAST_ADDITIONS,
+  DAVID,
+  DEFAULT_CREW,
+  parseCrew,
+} from "./model";
 
 function hit(state: BattleState, move: MoveId) {
   return battleReducer(battleReducer(state, { type: "choose", move }), {
@@ -126,18 +132,16 @@ describe("signature abilities", () => {
   it("gives the named cast distinct moves even after renaming or migrating a character", () => {
     const signatures = DEFAULT_CREW.filter(
       (character) => character.preset || character.kind === "mint",
-    ).map(
-      (character) => createBattle(character, "Opponent").player.signature?.name,
-    );
-    expect(signatures).toHaveLength(25);
-    expect(signatures).not.toContain(undefined);
-    expect(new Set(signatures).size).toBe(25);
+    ).map((character) => createBattle(character, "Opponent").player.signatures);
+    expect(signatures).toHaveLength(26);
+    expect(signatures.every((moves) => moves.length > 0)).toBe(true);
+    expect(new Set(signatures.flat().map((move) => move.name)).size).toBe(29);
     const renamed = { ...DAVID, name: "Dave", preset: undefined };
     const migrated = { ...DAVID, id: "friend-20" };
-    expect(createBattle(renamed, blindian).player.signature?.name).toBe(
+    expect(createBattle(renamed, blindian).player.signatures[0].name).toBe(
       "Grace",
     );
-    expect(createBattle(migrated, blindian).player.signature?.name).toBe(
+    expect(createBattle(migrated, blindian).player.signatures[0].name).toBe(
       "Grace",
     );
   });
@@ -206,7 +210,7 @@ describe("signature abilities", () => {
     };
     const [custom] = parseCrew([{ ...DAVID, ability }]);
     const battle = createBattle(custom, blindian);
-    expect(battle.player.signature).toMatchObject({
+    expect(battle.player.signatures[0]).toMatchObject({
       name: ability.name,
       visual: ability.style,
       art: ability.art,
@@ -221,8 +225,55 @@ describe("signature abilities", () => {
       },
     ]);
     expect(invalid.ability).toBeUndefined();
-    expect(createBattle(invalid, blindian).player.signature?.name).toBe(
+    expect(createBattle(invalid, blindian).player.signatures[0].name).toBe(
       "Grace",
     );
+  });
+
+  it("makes Diddy Party skip one turn on a timed hit and leaves the target awake on a miss", () => {
+    const duel = createBattle(BABASHARK, DAVID);
+    expect(duel.player.signatures.map((move) => move.name)).toEqual([
+      "Diddy Party",
+      "Kick the Baby",
+      "SIMPs Assemble",
+      "Chaz",
+    ]);
+    expect(getMove(duel.opponent, "diddy-party")).toBeUndefined();
+    const asleep = hit(duel, "diddy-party");
+    expect(asleep.opponent).toMatchObject({ hp: 90, asleep: true });
+    expect(asleep.event).toMatchObject({ damage: 0, slept: true });
+    const next = advance(asleep);
+    expect(next).toMatchObject({
+      phase: "choose",
+      round: 2,
+      event: { move: "sleep" },
+    });
+    expect(next.opponent.asleep).toBe(false);
+    const miss = battleReducer(
+      battleReducer(duel, { type: "choose", move: "diddy-party" }),
+      {
+        type: "timing",
+        grade: "miss",
+      },
+    );
+    expect(miss.opponent.asleep).toBe(false);
+    expect(advance(miss).phase).toBe("block");
+  });
+
+  it("uses the baby and Corvette for damage and cash to heal the caster", () => {
+    const duel = createBattle(BABASHARK, DAVID);
+    for (const move of ["kick-the-baby", "chaz"] as const) {
+      const resolved = hit(duel, move);
+      expect(resolved.event?.visual).toBe(move);
+      expect(resolved.opponent.hp).toBeLessThan(duel.opponent.hp);
+    }
+    const hurt = { ...duel, player: { ...duel.player, hp: 70 } };
+    const healed = hit(hurt, "simps-assemble");
+    expect(healed.player).toMatchObject({ hp: 100, pp: 4 });
+    expect(healed.event).toMatchObject({
+      visual: "simps-assemble",
+      damage: -30,
+    });
+    expect(healed.opponent).toEqual(duel.opponent);
   });
 });

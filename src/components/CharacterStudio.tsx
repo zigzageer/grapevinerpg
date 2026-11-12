@@ -12,7 +12,7 @@ import {
 import { Modal } from "./Modal";
 import { Portrait } from "./Character";
 import { normalizeCharacter, type Character } from "../game/model";
-import { getSignatureMove } from "../game/abilities";
+import { getSignatureMoves } from "../game/abilities";
 import {
   studioRequest,
   StudioRequestError,
@@ -87,7 +87,7 @@ export function CharacterStudio({
   const busy = readingImage || submitting || Boolean(pendingId);
   const editing = Boolean(selectedId);
   const moveOnly = editing && abilityOnly;
-  const previewMove = preview && getSignatureMove(preview.character);
+  const previewMoves = preview ? getSignatureMoves(preview.character) : [];
   const unpublished = drafts.filter(
     (draft) => !game?.characters.some((c) => c.id === draft.id),
   );
@@ -578,8 +578,9 @@ export function CharacterStudio({
             )}
           </div>
           <strong>{preview?.character.name || name || "Your character"}</strong>
-          {previewMove && (
+          {previewMoves.map((previewMove) => (
             <figure
+              key={previewMove.id}
               className="studio-ability"
               aria-label="Signature ability preview"
             >
@@ -597,7 +598,7 @@ export function CharacterStudio({
                 </span>
               </figcaption>
             </figure>
-          )}
+          ))}
           {busy && (
             <p className="studio-progress" role="status">
               <LoaderCircle size={16} className="studio-spinning" />
