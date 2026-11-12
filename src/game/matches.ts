@@ -4,6 +4,7 @@ export interface MatchFighter {
   sprite: string | null;
   ability: string;
   hp: number;
+  startingHp?: number;
   abilityUsed: boolean;
 }
 
@@ -21,11 +22,13 @@ export interface MatchEvent {
   move: string;
   damage: number;
   targetHp: number;
+  actorHp?: number;
 }
 
 export interface MatchSnapshot {
   id: string;
   kind: "war" | "duel";
+  mode?: "auto";
   status: "offered" | "signup" | "running" | "finished" | "cancelled";
   createdAt: number;
   joinUntil: number | null;

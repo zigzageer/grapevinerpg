@@ -9,7 +9,7 @@ import {
   Trophy,
   Users,
 } from "lucide-react";
-import type { MatchFighter, MatchSnapshot } from "../game/matches";
+import type { MatchEvent, MatchFighter, MatchSnapshot } from "../game/matches";
 import { studioRequest } from "../game/studio";
 import "./match-replay.css";
 
@@ -46,6 +46,53 @@ function Fighter({
       </div>
       <span className="replay-hp">{hp} HP</span>
     </li>
+  );
+}
+
+function ReplayMove({
+  event,
+  fighters,
+}: {
+  event: MatchEvent;
+  fighters: Map<string, MatchFighter>;
+}) {
+  const actor = fighters.get(event.actorId)?.name;
+  const target = fighters.get(event.targetId)?.name;
+  const { actorHp, damage, kind, move, targetHp } = event;
+  if (actorHp !== undefined) {
+    return (
+      <>
+        <strong>{actor}</strong> used {move}
+        <span>Recovered to {actorHp} HP</span>
+      </>
+    );
+  }
+  if (kind === "attack" && (move === "Stunned" || move === "Asleep")) {
+    return (
+      <>
+        <strong>{target}</strong> missed a turn<span>{move}</span>
+      </>
+    );
+  }
+  if (kind === "attack" && move === "Burning") {
+    return (
+      <>
+        <strong>{target}</strong> took burn damage
+        <span>{targetHp ? `${damage} damage` : "Knocked out"}</span>
+      </>
+    );
+  }
+  const outcome =
+    targetHp === 0
+      ? "Knocked out"
+      : damage
+        ? `${damage} damage`
+        : "Status effect";
+  return (
+    <>
+      <strong>{actor}</strong> used {move} on <strong>{target}</strong>
+      <span>{outcome}</span>
+    </>
   );
 }
 
@@ -132,9 +179,12 @@ export function MatchReplay({ id }: { id: string }) {
   const fighters = new Map(
     match.sides.flatMap((side) => side.players.map((p) => [p.id, p] as const)),
   );
-  const replayHealth = new Map(
-    events.map((event) => [event.targetId, event.targetHp]),
-  );
+  const replayHealth = new Map<string, number>();
+  for (const event of events) {
+    replayHealth.set(event.targetId, event.targetHp);
+    if (event.actorHp !== undefined)
+      replayHealth.set(event.actorId, event.actorHp);
+  }
   const sideTitle = (index: 0 | 1) => {
     const side = match.sides[index];
     return match.kind === "duel" && side.players.length
@@ -142,6 +192,12 @@ export function MatchReplay({ id }: { id: string }) {
       : side.name;
   };
   const winner = match.winnerSide === null ? null : sideTitle(match.winnerSide);
+  const matchLabel =
+    match.kind === "war"
+      ? "Server War"
+      : match.mode === "auto"
+        ? "Discord Fight"
+        : "Discord Duel";
   const cancellationReasons: Record<string, string> = {
     "not-enough-players": "A team fell short of the signup minimum.",
     "challenge-expired": "The challenge expired.",
@@ -160,16 +216,13 @@ export function MatchReplay({ id }: { id: string }) {
             : "Match cancelled";
 
   return (
-    <main
-      className="match-replay"
-      aria-label={match.kind === "war" ? "Server war" : "Discord duel"}
-    >
+    <main className="match-replay" aria-label={matchLabel}>
       <a className="replay-back" href="/grapevine">
         <ArrowLeft size={17} /> Grapevine
       </a>
       <header className="replay-heading">
         <div>
-          <p>{match.kind === "war" ? "Server War" : "Discord Duel"}</p>
+          <p>{matchLabel}</p>
           <h1>
             {sideTitle(0)} <span>vs</span> {sideTitle(1)}
           </h1>
@@ -228,7 +281,9 @@ export function MatchReplay({ id }: { id: string }) {
                     hp={
                       step === null
                         ? fighter.hp
-                        : (replayHealth.get(fighter.id) ?? 100)
+                        : (replayHealth.get(fighter.id) ??
+                          fighter.startingHp ??
+                          100)
                     }
                     turn={
                       fighter.id ===
@@ -278,12 +333,7 @@ export function MatchReplay({ id }: { id: string }) {
             <ol reversed start={events.length}>
               {[...events].reverse().map((event) => (
                 <li key={event.seq} data-current={event.seq === latest?.seq}>
-                  <strong>{fighters.get(event.actorId)?.name}</strong> used{" "}
-                  {event.move} on{" "}
-                  <strong>{fighters.get(event.targetId)?.name}</strong>
-                  <span>
-                    {event.targetHp ? `${event.damage} damage` : "Knocked out"}
-                  </span>
+                  <ReplayMove event={event} fighters={fighters} />
                 </li>
               ))}
             </ol>

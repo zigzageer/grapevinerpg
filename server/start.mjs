@@ -6,6 +6,7 @@ import { StudioService } from "./studio-service.mjs";
 import { createVercelVerifier } from "./vercel-auth.mjs";
 import { createStudioServer } from "./studio-http.mjs";
 import { MatchService } from "./match-service.mjs";
+import { createFightGifRenderer, FightGifQueue } from "./fight-gif-queue.mjs";
 
 const env = process.env;
 for (const key of [
@@ -31,6 +32,13 @@ const matches = new MatchService({
   directory: env.MINT_STUDIO_DATA_DIR,
   loadGame: (id) => service.loadGame(id),
   baseUrl,
+  grapevineGuildId: env.MINT_GRAPEVINE_GUILD_ID || undefined,
+});
+const fightGifs = new FightGifQueue({
+  render: createFightGifRenderer({
+    baseUrl,
+    readStudioImage: (id) => store.image(id),
+  }),
 });
 const matchTimer = setInterval(() => {
   try {
@@ -45,6 +53,7 @@ const server = createStudioServer({
   secret: env.MINT_STUDIO_SECRET,
   matches,
   matchBotSecret: env.MINT_MATCH_BOT_SECRET,
+  fightGifs,
   verifyVercel: createVercelVerifier({
     teamSlug: env.MINT_STUDIO_VERCEL_TEAM_SLUG || "tensymain-8759s-projects",
     teamId: env.MINT_STUDIO_VERCEL_TEAM_ID || "team_YMxRg3j0ixQCGCc8wjrgWSZz",
@@ -69,13 +78,17 @@ for (const signal of ["SIGTERM", "SIGINT"])
   process.once(signal, () => {
     clearInterval(matchTimer);
     service.close();
+    let gifsClosed = false;
+    void fightGifs.close().finally(() => {
+      gifsClosed = true;
+    });
     let httpClosed = false;
     server.close(() => {
       httpClosed = true;
     });
     // A running Codex child is terminated with the service process group by systemd.
     const stop = setInterval(() => {
-      if (httpClosed && !service.running) {
+      if (httpClosed && gifsClosed && !service.running) {
         clearInterval(stop);
         matches.close();
         store.close();

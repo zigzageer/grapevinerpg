@@ -1,5 +1,6 @@
 import { WORLD, WALK_BOUNDS, TOWN_OBSTACLES, type Footprint } from "./locations.ts";
-export { WORLD };
+import { normalizeGeneratedAbility } from "./ability-moves.mjs";
+export { WORLD, normalizeGeneratedAbility };
 export type Point = { x: number; y: number };
 export type Hair = "short" | "messy" | "long" | "curly" | "bald";
 export type Hat = "none" | "beanie" | "cap";
@@ -504,28 +505,6 @@ export function createCrewMember(index: number): Character {
 }
 export const hex = (value: unknown, fallback: string) =>
   typeof value === "string" && /^#[\da-f]{6}$/i.test(value) ? value : fallback;
-
-export function normalizeGeneratedAbility(
-  input: unknown,
-): GeneratedAbility | undefined {
-  if (!input || typeof input !== "object") return;
-  const { name, description, style, art } = input as Record<string, unknown>;
-  if (
-    typeof name !== "string" ||
-    !name.trim() ||
-    name.trim().length > 28 ||
-    typeof description !== "string" ||
-    !description.trim() ||
-    description.trim().length > 120 ||
-    (style !== "burst" && style !== "projectile" && style !== "rush") ||
-    typeof art !== "string" ||
-    !/^\/api\/studio\/assets\/[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}\.png$/.test(
-      art,
-    )
-  )
-    return;
-  return { name: name.trim(), description: description.trim(), style, art };
-}
 
 export function normalizeCharacter(
   raw: unknown,

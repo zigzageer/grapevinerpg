@@ -1,3 +1,4 @@
+import { BASIC_MOVES } from "./ability-moves.mjs";
 import { getSignatureMoves } from "./abilities";
 import type { Character } from "./model";
 
@@ -40,50 +41,7 @@ export interface SignatureMove extends Move {
   id: SignatureMoveId;
 }
 
-export const MOVES: Record<BasicMoveId, Move> = {
-  quick: {
-    name: "Quick hits",
-    description: "Three light hits. Armor reduces each hit.",
-    cost: 0,
-    damage: 8,
-    hits: 3,
-    armor: 1,
-  },
-  heavy: {
-    name: "Heavy hit",
-    description: "One big swing that punches through most armor.",
-    cost: 0,
-    damage: 22,
-    hits: 1,
-    armor: 0.25,
-  },
-  snowball: {
-    name: "Snowball",
-    description: "A ranged attack with a well-packed snowball.",
-    cost: 0,
-    damage: 19,
-    hits: 1,
-    armor: 1,
-  },
-  spark: {
-    name: "Paper spark",
-    description: "Ignores armor. Good timing adds two turns of burning.",
-    cost: 3,
-    damage: 19,
-    hits: 1,
-    armor: 0,
-    effect: "burn",
-  },
-  stomp: {
-    name: "Ground stomp",
-    description: "A perfect hit stuns your opponent for one turn.",
-    cost: 4,
-    damage: 20,
-    hits: 1,
-    armor: 0.5,
-    effect: "stun",
-  },
-};
+export const MOVES = BASIC_MOVES;
 
 export interface Fighter {
   name: string;

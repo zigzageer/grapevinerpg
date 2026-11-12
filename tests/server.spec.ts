@@ -338,6 +338,113 @@ test("the battle page reads the signup and steps through the finished replay", a
   await expect(hp).toHaveAttribute("value", "0");
 });
 
+test("the automatic fight replay shows recovery and missed turns", async ({
+  page,
+}) => {
+  const id = "00000000-1000-4000-8000-000000000002";
+  const match: MatchSnapshot = {
+    id,
+    kind: "duel",
+    mode: "auto",
+    status: "finished",
+    createdAt: Date.now(),
+    joinUntil: null,
+    minPlayersPerSide: 1,
+    winnerSide: 0,
+    reason: null,
+    turnFighterId: null,
+    replayUrl: `/wars/${id}`,
+    sides: [
+      {
+        guildId: GUILD,
+        name: "Grapevine",
+        players: [
+          {
+            id: "a",
+            name: "Mint",
+            sprite: null,
+            ability: "Peppermint Pop",
+            hp: 100,
+            startingHp: 100,
+            abilityUsed: true,
+          },
+        ],
+      },
+      {
+        guildId: GUILD,
+        name: "Grapevine",
+        players: [
+          {
+            id: "b",
+            name: "Bob",
+            sprite: null,
+            ability: "Recover",
+            hp: 0,
+            startingHp: 100,
+            abilityUsed: true,
+          },
+        ],
+      },
+    ],
+    events: [
+      {
+        seq: 1,
+        kind: "attack",
+        actorId: "a",
+        targetId: "b",
+        move: "Strike",
+        damage: 22,
+        targetHp: 78,
+      },
+      {
+        seq: 2,
+        kind: "ability",
+        actorId: "b",
+        targetId: "a",
+        move: "Recover",
+        damage: 0,
+        targetHp: 100,
+        actorHp: 96,
+      },
+      {
+        seq: 3,
+        kind: "attack",
+        actorId: "a",
+        targetId: "b",
+        move: "Stunned",
+        damage: 0,
+        targetHp: 96,
+      },
+      {
+        seq: 4,
+        kind: "ability",
+        actorId: "a",
+        targetId: "b",
+        move: "Peppermint Pop",
+        damage: 96,
+        targetHp: 0,
+      },
+    ],
+  };
+  await page.route(`**/api/studio/matches/${id}`, (route) =>
+    route.fulfill({ json: match }),
+  );
+  await page.goto(`/wars/${id}`);
+  await expect(page.getByRole("main", { name: "Discord Fight" })).toBeVisible();
+  const next = page.getByRole("button", { name: "Next move" });
+  const hp = page.getByRole("meter", { name: "Bob health" });
+  await next.click();
+  await expect(hp).toHaveAttribute("value", "78");
+  await next.click();
+  await expect(hp).toHaveAttribute("value", "96");
+  await expect(page.getByText("Recovered to 96 HP")).toBeVisible();
+  await next.click();
+  await expect(page.getByText("Bob missed a turn")).toBeVisible();
+  await next.click();
+  await expect(hp).toHaveAttribute("value", "0");
+  await expect(page.getByText("Mint wins", { exact: true })).toBeVisible();
+});
+
 for (const viewport of [
   { width: 390, height: 844 },
   { width: 844, height: 390 },

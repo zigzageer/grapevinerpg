@@ -33,3 +33,27 @@ Each snapshot contains `id` (UUID), `kind`, `status`, `createdAt`, `joinUntil`, 
 The service stores matches and links in `server-matches.sqlite` in the configured studio data directory. Set `MINT_MATCH_BOT_SECRET` on both VPS processes before enabling bot match commands. The public gateway serves match snapshots through the existing studio connection.
 
 For the existing Ubuntu deployment, the studio and bot can load the same root-owned `/etc/jackbox-rpg.env` with systemd `EnvironmentFile`. The bot uses the existing studio HTTPS origin and `/etc/mint-studio/ca.pem`. Keep the match secret dedicated to the internal match routes.
+
+## Automatic Discord fights
+
+`/fighter set` selects an owned fighter and enables automatic fights in that server. A bot-created character with ID `discord-<userId>` is already eligible. A server manager can use `/fighter assign` to grant an existing roster character to a member, who then enables it with `/fighter set`. `/fighter pause` opts out. The optional studio setting `MINT_GRAPEVINE_GUILD_ID` lets managers in that Discord guild assign published characters from the legacy Grapevine roster as well as their guild roster. Set it to the verified Discord guild ID.
+
+`/fight user:@member` starts a simulated duel between two enabled fighters. The VPS saves the replay and score once. The bot attaches the resulting GIF, the winner, and a replay link in the channel. Use `/duel` for a turn-by-turn challenge.
+
+`/leaderboard scope:server` counts fights in the current guild. `scope:global` counts each Discord account across participating guilds. All completed automatic fights count toward win/loss history. The winner receives one point for the first scoring fight between that pair in a rolling 24-hour window across guilds.
+
+### Signed bot endpoints
+
+Use the same dedicated match secret and interaction ID as above. The bot checks membership, bots, channel permissions, and Manage Server against the Discord interaction.
+
+| Method and path                                  | Request or result                                                                                                                                                                                                                           |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /internal/v1/fighters/<guildId>`            | `{ characters: [{ id, name }] }` for manager autocomplete.                                                                                                                                                                                  |
+| `GET /internal/v1/fighters/<guildId>/<memberId>` | `{ userId, characterId, name, enabled, choices: [{ id, name }] }` for fighter selection.                                                                                                                                                    |
+| `POST /internal/v1/fighters`                     | `{ requestId, guildId, userId, action, characterId?, memberId?, manageGuild? }`. Actions `set`, `pause`, and `assign`. Assignment requires `memberId`, `characterId`, and `manageGuild: true`. Returns the fighter selection or assignment. |
+| `POST /internal/v1/fights`                       | `{ requestId, guildId, userId, opponentUserId }` → `{ match, score: { awarded, winnerUserId } }`. An identical retry returns the saved result.                                                                                              |
+| `GET /internal/v1/fights/<matchId>/gif`          | `202` with `{ status: "queued" }` while rendering, `200 image/gif` when ready, or `503` if unavailable. The bot can still deliver the winner and `match.replayUrl`.                                                                         |
+| `GET /internal/v1/leaderboards/global`           | `{ entries: [{ rank, userId, name, wins, losses, points }] }` for all guilds.                                                                                                                                                               |
+| `GET /internal/v1/leaderboards/guild/<guildId>`  | The same shape for the requested guild.                                                                                                                                                                                                     |
+
+Automatic matches use `kind: "duel"`, `mode: "auto"`, and `status: "finished"`. They use the existing public replay URL. The snapshot adds starting HP, optional ability art, and the actor's post-heal HP where applicable. Scores stay in `server-matches.sqlite` alongside match history. The VPS runs one GIF render at a time and returns attachments up to 3,000,000 bytes.

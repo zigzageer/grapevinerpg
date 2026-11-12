@@ -10,6 +10,7 @@ export function createStudioServer({
   verifyVercel,
   matches,
   matchBotSecret,
+  fightGifs,
 }) {
   const handle = async (request, response) => {
     response.setHeader("Cache-Control", "no-store");
@@ -79,6 +80,56 @@ export function createStudioServer({
       }
       if (matches && matchInternal) {
         const [, , resource, id, member] = parts;
+        if (request.method === "GET") {
+          if (
+            fightGifs &&
+            resource === "fights" &&
+            member === "gif" &&
+            parts.length === 5
+          ) {
+            const { match } = matches.getAutoFight(id);
+            const result = fightGifs.request(match);
+            if (result.status === "ready") {
+              response.writeHead(200, {
+                "Content-Type": "image/gif",
+                "Content-Length": result.bytes.length,
+              });
+              response.end(result.bytes);
+            } else if (result.status === "queued") {
+              send(202, { status: "queued" });
+            } else {
+              send(503, {
+                error:
+                  "The fight GIF is unavailable. Open the replay to see the fight.",
+              });
+            }
+            return;
+          }
+          if (resource === "fighters" && parts.length === 4) {
+            send(200, await matches.listFighters(id));
+            return;
+          }
+          if (resource === "fighters" && parts.length === 5) {
+            send(200, await matches.getFighter(id, member));
+            return;
+          }
+          if (
+            resource === "leaderboards" &&
+            id === "global" &&
+            parts.length === 4
+          ) {
+            send(200, matches.leaderboard());
+            return;
+          }
+          if (
+            resource === "leaderboards" &&
+            id === "guild" &&
+            parts.length === 5
+          ) {
+            send(200, matches.leaderboard(member));
+            return;
+          }
+        }
         if (
           request.method === "GET" &&
           resource === "links" &&
@@ -96,6 +147,14 @@ export function createStudioServer({
           return;
         }
         if (request.method === "POST") {
+          if (resource === "fighters" && parts.length === 3) {
+            send(200, await matches.updateFighter(input));
+            return;
+          }
+          if (resource === "fights" && parts.length === 3) {
+            send(201, await matches.fight(input));
+            return;
+          }
           if (resource === "links" && parts.length === 3) {
             send(200, await matches.link(input));
             return;
