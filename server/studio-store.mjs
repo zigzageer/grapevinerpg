@@ -49,7 +49,6 @@ export class StudioStore {
         source TEXT NOT NULL, created_at TEXT NOT NULL,
         FOREIGN KEY(game_id,character_id) REFERENCES characters(game_id,id)
       );
-      CREATE TABLE IF NOT EXISTS quota(ip_hash TEXT PRIMARY KEY, used INTEGER NOT NULL CHECK(used BETWEEN 0 AND 3));
       CREATE TABLE IF NOT EXISTS jobs(
         id TEXT PRIMARY KEY, game_id TEXT NOT NULL, character_id TEXT NOT NULL,
         ip_hash TEXT, source TEXT NOT NULL, status TEXT NOT NULL,
@@ -58,37 +57,63 @@ export class StudioStore {
       CREATE UNIQUE INDEX IF NOT EXISTS active_character_job ON jobs(game_id,character_id)
         WHERE status IN ('queued','running');
     `);
+    // Keep the existing salt so saved jobs and drafts can still be reopened.
     this.db
       .prepare("INSERT OR IGNORE INTO settings VALUES('quota_salt',?)")
       .run(randomBytes(32).toString("hex"));
-    this.quotaSalt = this.db
+    this.ownerSalt = this.db
       .prepare("SELECT value FROM settings WHERE key='quota_salt'")
       .get().value;
-    if (seed) {
-      this.update(
-        "mint",
-        (game) => {
-          const additions = seed.characters
-            .filter((character) => !this.character("mint", character.id))
-            .slice(
-              0,
-              Math.max(0, MINT_CREW_LIMIT - (game?.characters.length || 0)),
-            );
-          if (game && !additions.length) return game;
-          return {
-            ...(game || {
-              version: 1,
-              guildId: "mint",
-              slug: "",
-              name: "Adventures of Mint",
-              updatedAt: now(),
-            }),
-            characters: [...(game?.characters || []), ...additions],
-          };
-        },
-        { descriptions: seed.descriptions },
-      );
-    }
+    if (seed) this.addMintRoster(seed);
+  }
+
+  addMintRoster(seed) {
+    const characters = seed?.characters;
+    if (
+      !Array.isArray(characters) ||
+      !characters.length ||
+      characters.length > MINT_CREW_LIMIT ||
+      new Set(characters.map((character) => character?.id)).size !==
+        characters.length ||
+      characters.some(
+        (character) =>
+          !character ||
+          typeof character.id !== "string" ||
+          !/^[A-Za-z0-9_-]{1,80}$/.test(character.id) ||
+          typeof character.name !== "string" ||
+          !character.name.trim() ||
+          character.name.length > 28,
+      ) ||
+      (seed.descriptions !== undefined &&
+        (!seed.descriptions ||
+          typeof seed.descriptions !== "object" ||
+          Array.isArray(seed.descriptions) ||
+          Object.values(seed.descriptions).some(
+            (value) => typeof value !== "string",
+          )))
+    )
+      throw new StudioError("The published Mint roster could not be read.");
+
+    this.update(
+      "mint",
+      (game) => {
+        const additions = characters
+          .filter((character) => !this.character("mint", character.id))
+          .slice(0, Math.max(0, MINT_CREW_LIMIT - (game?.characters.length || 0)));
+        if (game && !additions.length) return game;
+        return {
+          ...(game || {
+            version: 1,
+            guildId: "mint",
+            slug: "",
+            name: "Adventures of Mint",
+            updatedAt: now(),
+          }),
+          characters: [...(game?.characters || []), ...additions],
+        };
+      },
+      { descriptions: seed.descriptions },
+    );
   }
 
   transaction(task) {
@@ -284,14 +309,7 @@ export class StudioStore {
   }
 
   hashIp(ip) {
-    return createHmac("sha256", this.quotaSalt).update(ip).digest("hex");
-  }
-
-  quota(ipHash) {
-    const used =
-      this.db.prepare("SELECT used FROM quota WHERE ip_hash=?").get(ipHash)
-        ?.used || 0;
-    return { limit: 3, used, remaining: 3 - used };
+    return createHmac("sha256", this.ownerSalt).update(ip).digest("hex");
   }
 
   enqueue({
@@ -348,11 +366,6 @@ export class StudioStore {
           "This character is already being generated. Wait for it to finish.",
           409,
         );
-      if (ipHash && this.quota(ipHash).remaining === 0)
-        throw new StudioError(
-          "This IP address has used all 3 generation attempts.",
-          429,
-        );
       const disk = statfsSync(this.directory);
       if (disk.bavail * disk.bsize < 8_000_000)
         throw new StudioError(
@@ -377,12 +390,6 @@ export class StudioStore {
           )
           .run(gameId, character.id, JSON.stringify(character), now());
       }
-      if (ipHash)
-        this.db
-          .prepare(
-            "INSERT INTO quota VALUES(?,1) ON CONFLICT(ip_hash) DO UPDATE SET used=used+1",
-          )
-          .run(ipHash);
       this.db
         .prepare(
           "INSERT INTO jobs(id,game_id,character_id,ip_hash,source,status,payload,request_hash,created_at) VALUES(?,?,?,?,?,'queued',?,?,?)",
@@ -412,7 +419,6 @@ export class StudioStore {
       status: row.status,
       result: row.result ? JSON.parse(row.result) : null,
       error: row.error,
-      ...(ipHash ? { quota: this.quota(ipHash) } : {}),
     };
   }
 

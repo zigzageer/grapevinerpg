@@ -1,4 +1,4 @@
-import { WORLD, WALK_BOUNDS, TOWN_OBSTACLES } from "./locations";
+import { WORLD, WALK_BOUNDS, TOWN_OBSTACLES } from "./locations.ts";
 export { WORLD };
 export type Point = { x: number; y: number };
 export type Hair = "short" | "messy" | "long" | "curly" | "bald";

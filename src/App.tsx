@@ -100,7 +100,6 @@ function Game({ server }: { server?: ServerGame }) {
   const [openPanel, setPanel] = useState<Panel>(null),
     [search, setSearch] = useState("");
   const sharedUpdatedAt = useRef(0);
-  const [studioCrew, setStudioCrew] = useState<Character[] | null>();
   const [editorCharacter, setEditorCharacter] = useState<Character>();
   const [interaction, setInteraction] = useState<{
     actor: Character;
@@ -138,7 +137,7 @@ function Game({ server }: { server?: ServerGame }) {
   const activeKey = active?.id ?? "";
   const panel = openPanel ?? (active ? null : "characters");
   const tvLook = game.tvLook !== false;
-  const canUseStudio = studioAvailable() && (!!server || studioCrew !== null);
+  const canUseStudio = studioAvailable();
   state.current = game;
   blocked.current = !!panel;
   const notify = useCallback((message: string) => {
@@ -188,11 +187,12 @@ function Game({ server }: { server?: ServerGame }) {
     setEditorCharacter(character);
     const inStudio =
       server ||
-      (studioCrew ?? DEFAULT_CREW).some(
+      character.sprite?.startsWith("/api/studio/assets/") ||
+      DEFAULT_CREW.some(
         (c) =>
           c.id === character.id &&
-          (c.preset === character.preset ||
-            character.sprite?.startsWith("/api/studio/assets/")),
+          c.preset === character.preset &&
+          (c.kind === "mint" || c.preset || c.sprite),
       );
     setPanel(canUseStudio && inStudio ? "studio" : "crew");
   };
@@ -257,7 +257,6 @@ function Game({ server }: { server?: ServerGame }) {
         )
           return;
         sharedUpdatedAt.current = Date.parse(shared.updatedAt);
-        setStudioCrew(shared.characters);
         const applied = readAppliedVersions();
         setGame((current) => {
           const crew = mergeStudioCrew(current.crew, shared, applied);
@@ -265,8 +264,6 @@ function Game({ server }: { server?: ServerGame }) {
         });
         rememberAppliedVersions(shared);
       } catch {
-        if (!controller.signal.aborted)
-          setStudioCrew((current) => current ?? null);
         /* The existing cast and browser saves remain playable during a connection failure. */
       }
     };
@@ -849,7 +846,6 @@ function Game({ server }: { server?: ServerGame }) {
                 : mergeStudioCrew(current.crew, shared, applied),
             }));
             if (!server) {
-              setStudioCrew(shared.characters);
               rememberAppliedVersions(shared);
             }
             notify("Character saved.");

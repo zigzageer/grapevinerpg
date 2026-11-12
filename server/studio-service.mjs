@@ -22,6 +22,8 @@ export class StudioService {
     this.generateAbility = generateAbility;
     this.baseUrl = baseUrl;
     this.fetch = request;
+    this.mintRosterSync = null;
+    this.nextMintRosterCheck = 0;
     this.running = false;
     this.closing = false;
     store.recoverJobs();
@@ -30,10 +32,6 @@ export class StudioService {
   ipHash(ip) {
     return this.store.hashIp(ip);
   }
-  quota(ip) {
-    return this.store.quota(this.ipHash(ip));
-  }
-
   game(id) {
     if (!validGameId(id)) throw new StudioError("Invalid game ID.");
     const game = this.store.read(id);
@@ -44,7 +42,9 @@ export class StudioService {
 
   async loadGame(id) {
     if (!validGameId(id)) throw new StudioError("Invalid game ID.");
-    if (id !== "mint") {
+    if (id === "mint") {
+      await this.syncMintRoster();
+    } else {
       try {
         const response = await this.fetch(
           new URL(`/games/${id}/game.json`, this.baseUrl),
@@ -65,6 +65,49 @@ export class StudioService {
       }
     }
     return this.game(id);
+  }
+
+  async syncMintRoster() {
+    if (this.mintRosterSync) return this.mintRosterSync;
+    if (Date.now() < this.nextMintRosterCheck) return;
+    this.mintRosterSync = (async () => {
+      try {
+        const response = await this.fetch(
+          new URL("/games/mint-studio.json", this.baseUrl),
+          {
+            cache: "no-store",
+            redirect: "error",
+            signal: AbortSignal.timeout(5000),
+          },
+        );
+        if (
+          response.ok &&
+          response.headers.get("content-type")?.includes("application/json")
+        )
+          this.store.addMintRoster(await response.json());
+      } catch {
+        // The seeded roster and saved generations remain available during a site outage.
+      }
+    })();
+    try {
+      await this.mintRosterSync;
+    } finally {
+      this.nextMintRosterCheck = Date.now() + 60_000;
+      this.mintRosterSync = null;
+    }
+  }
+
+  async character(gameId, characterId) {
+    const saved = this.store.character(gameId, characterId);
+    if (saved || gameId !== "mint") return saved;
+    await this.syncMintRoster();
+    return this.store.character(gameId, characterId);
+  }
+
+  async history(gameId, characterId) {
+    this.game(gameId);
+    await this.character(gameId, characterId);
+    return this.store.history(gameId, characterId);
   }
 
   async enqueue(input, ip) {
@@ -107,7 +150,7 @@ export class StudioService {
     }
     let character;
     if (characterId) {
-      const row = this.store.character(gameId, characterId);
+      const row = await this.character(gameId, characterId);
       if (!row) throw new StudioError("Character not found.", 404);
       character = JSON.parse(row.data);
     } else {

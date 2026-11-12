@@ -80,29 +80,34 @@ async function done(service) {
   assert.equal(service.running, false, "The queue finished");
 }
 
-test("three attempts are atomic, shared across towns and persistent across database reloads", async (t) => {
+test("the same IP can generate beyond the former limit, including across towns", async (t) => {
   const { service, store, directory } = setup(t);
-  const requests = Array.from({ length: 4 }, () =>
-    service.enqueue(input(), IP),
+  const owner = service.ipHash(IP);
+  store.db.exec(
+    "CREATE TABLE quota(ip_hash TEXT PRIMARY KEY, used INTEGER NOT NULL)",
   );
-  const results = await Promise.allSettled(requests);
-  assert.equal(results.filter((r) => r.status === "fulfilled").length, 3);
-  assert.equal(
-    results.filter((r) => r.status === "rejected" && r.reason.status === 429)
-      .length,
-    1,
+  store.db.prepare("INSERT INTO quota VALUES(?, 3)").run(owner);
+  const jobs = await Promise.all(
+    Array.from({ length: 4 }, () => service.enqueue(input(), IP)),
   );
-  await done(service);
-  assert.equal(service.quota(IP).remaining, 0);
-  const second = new StudioStore({ directory });
-  assert.equal(second.quota(service.ipHash(IP)).used, 3);
-  second.close();
   const guildId = "123456789012345678";
   store.importManifest(guildId, manifest(guildId));
-  await assert.rejects(service.enqueue(input({ gameId: guildId }), IP), {
-    status: 429,
-  });
-  assert.equal(service.quota("203.0.113.26").remaining, 3);
+  jobs.push(await service.enqueue(input({ gameId: guildId }), IP));
+  await done(service);
+  const reopened = new StudioStore({ directory });
+  try {
+    assert.equal(reopened.hashIp(IP), owner);
+    assert.ok(
+      jobs.every(({ id }) => reopened.job(id, owner).status === "succeeded"),
+    );
+    assert.equal(
+      reopened.db.prepare("SELECT used FROM quota WHERE ip_hash=?").get(owner)
+        .used,
+      3,
+    );
+  } finally {
+    reopened.close();
+  }
 });
 
 test("all generations and the original survive previews, regeneration, and restoring history", async (t) => {
@@ -145,7 +150,6 @@ test("all generations and the original survive previews, regeneration, and resto
   assert.ok(store.read("mint").managedIds.includes("friend-8"));
   store.apply("mint", "friend-8", original);
   assert.equal(store.history("mint", "friend-8").currentVersionId, original);
-  assert.equal(service.quota(IP).used, 3);
   assert.equal(store.history("mint", "friend-8").versions.length, 4);
 });
 
@@ -205,7 +209,6 @@ test("an ability-only generation keeps the selected appearance, and later artwor
   store.apply("mint", "friend-8", version.versionId);
   const retry = await service.enqueue(abilityInput, IP);
   assert.equal(retry.id, job.id);
-  assert.equal(retry.quota.used, 2);
   const editJob = await service.enqueue(
     input({ characterId: "friend-8", name: "Miel with a cape" }),
     IP,
@@ -214,7 +217,6 @@ test("an ability-only generation keeps the selected appearance, and later artwor
   const edit = store.job(editJob.id, ipHash).result;
   assert.deepEqual(edit.character.ability, ability);
   assert.deepEqual(appearanceCalls[1].references[0].bytes, png);
-  assert.equal(service.quota(IP).used, 3);
 
   store.apply("mint", "friend-8", appearance.versionId);
   assert.equal(
@@ -228,7 +230,7 @@ test("an ability-only generation keeps the selected appearance, and later artwor
   );
 });
 
-test("appearance and ability generation share one attempt, and malformed ability requests are free", async (t) => {
+test("appearance and ability can be generated together and malformed ability requests are rejected", async (t) => {
   const { service, store } = setup(t, {
     generateAbility: async () => ({
       name: "Paper Pounce",
@@ -245,7 +247,6 @@ test("appearance and ability generation share one attempt, and malformed ability
   ]) {
     await assert.rejects(service.enqueue(input(extra), IP), { status: 400 });
   }
-  assert.equal(service.quota(IP).used, 0);
   const job = await service.enqueue(
     input({ name: "A new fighter", abilityPrompt: "Leap with paper scraps" }),
     IP,
@@ -255,7 +256,6 @@ test("appearance and ability generation share one attempt, and malformed ability
   assert.equal(result.character.ability.name, "Paper Pounce");
   assert.equal(result.character.sprite, result.image);
   assert.notEqual(result.character.ability.art, result.image);
-  assert.equal(service.quota(IP).used, 1);
 
   const original = store.history("mint", "you").versions[0];
   const abilityOnly = await service.enqueue(
@@ -275,7 +275,6 @@ test("appearance and ability generation share one attempt, and malformed ability
       .character,
     original.character,
   );
-  assert.equal(service.quota(IP).used, 2);
 });
 
 test("an uploaded reference and appearance edits reach generation while use-current=false is honored", async (t) => {
@@ -315,16 +314,15 @@ test("an uploaded reference and appearance edits reach generation while use-curr
     IP,
   );
   assert.equal(again.id, job.id);
-  assert.equal(service.quota(IP).used, 1);
   assert.equal(store.history("mint", "friend-8").versions.length, 2);
 });
 
-test("invalid requests and overlapping edits are rejected before consuming more quota", async (t) => {
+test("invalid requests and overlapping edits are rejected without starting extra jobs", async (t) => {
   let release;
   const pending = new Promise((resolve) => {
     release = resolve;
   });
-  const { service } = setup(t, { generate: () => pending });
+  const { service, store } = setup(t, { generate: () => pending });
   await assert.rejects(
     service.enqueue(
       input({ image: { type: "text/plain", base64: "bad" } }),
@@ -334,18 +332,18 @@ test("invalid requests and overlapping edits are rejected before consuming more 
   await assert.rejects(service.enqueue(input({ characterId: "missing" }), IP), {
     status: 404,
   });
-  assert.equal(service.quota(IP).used, 0);
-  await service.enqueue(input({ characterId: "friend-8" }), IP);
+  const job = await service.enqueue(input({ characterId: "friend-8" }), IP);
   await assert.rejects(
     service.enqueue(input({ characterId: "friend-8" }), IP),
     { status: 409 },
   );
-  assert.equal(service.quota(IP).used, 1);
   release(png);
   await done(service);
+  assert.equal(store.job(job.id, service.ipHash(IP)).status, "succeeded");
+  assert.equal(store.history("mint", "friend-8").versions.length, 2);
 });
 
-test("a failed generation preserves the active character and charges the accepted attempt", async (t) => {
+test("a failed generation preserves the active character and its history", async (t) => {
   const { service, store } = setup(t, {
     generate: async () => {
       throw new Error("Test generator failure");
@@ -357,7 +355,6 @@ test("a failed generation preserves the active character and charges the accepte
   assert.equal(store.job(job.id, service.ipHash(IP)).status, "failed");
   assert.equal(store.history("mint", "friend-8").currentVersionId, original);
   assert.equal(store.history("mint", "friend-8").versions.length, 1);
-  assert.equal(service.quota(IP).used, 1);
 });
 
 test("new characters remain saved drafts until applied and are isolated between servers", async (t) => {
@@ -443,7 +440,48 @@ test("website towns read published manifests and preserve website versions durin
   );
   assert.equal(store.history(guildId, job.characterId).versions.length, 2);
   assert.ok(requests.every((request) => request.method === "GET"));
-  assert.equal(service.quota(IP).used, 1);
+});
+
+test("the published Mint roster adds a character before their first edit", async (t) => {
+  const newCharacter = {
+    ...base,
+    id: "cast-babashark",
+    name: "babashark",
+    preset: "babashark",
+  };
+  let rosterReads = 0;
+  const { service, store } = setup(t, {
+    fetch: async (url) => {
+      if (url.pathname === "/games/mint-studio.json") {
+        rosterReads++;
+        return Response.json({
+          characters: [...seed.characters, newCharacter],
+          descriptions: { babashark: "An officer in olive uniform" },
+        });
+      }
+      assert.equal(url.pathname, "/characters/babashark.png");
+      return new Response(png, { headers: { "Content-Type": "image/png" } });
+    },
+  });
+  const mielHistory = store.history("mint", "friend-8");
+  assert.equal(store.character("mint", newCharacter.id), undefined);
+  const [history, roster] = await Promise.all([
+    service.history("mint", newCharacter.id),
+    service.loadGame("mint"),
+  ]);
+  assert.equal(rosterReads, 1);
+  assert.ok(roster.characters.some((c) => c.id === newCharacter.id));
+  assert.equal(history.versions[0].description, "An officer in olive uniform");
+  assert.deepEqual(store.history("mint", "friend-8"), mielHistory);
+  const job = await service.enqueue(
+    input({ characterId: newCharacter.id, name: newCharacter.name }),
+    IP,
+  );
+  await done(service);
+  assert.equal(store.job(job.id, service.ipHash(IP)).status, "succeeded");
+  assert.equal(store.history("mint", newCharacter.id).versions.length, 2);
+  await service.loadGame("mint");
+  assert.equal(rosterReads, 1);
 });
 
 test("all nine built-ins join a full pre-upgrade Mint roster without replacing custom characters or history", async (t) => {
@@ -521,7 +559,6 @@ test("all nine built-ins join a full pre-upgrade Mint roster without replacing c
       assert.ok(additions.every(({ id }) => roster.some((c) => c.id === id)));
       assert.equal(roster.find((c) => c.id === "friend-8").name, "Custom Miel");
       assert.deepEqual(reopened.history("mint", "friend-8"), history);
-      assert.equal(reopened.quota(service.ipHash(IP)).used, 1);
       assert.equal(
         reopened.history("mint", "cast-blindian").versions.length,
         1,
@@ -650,15 +687,15 @@ test("Vercel gateway forwards its trusted IP and blocks internal routes and cros
   const transport = async (args) => {
     calls++;
     assert.equal(args.ip, IP);
-    assert.equal(args.path, "/quota");
+    assert.equal(args.path, "/health");
     return {
       status: 200,
       type: "application/json",
-      bytes: Buffer.from('{"remaining":3}'),
+      bytes: Buffer.from('{"ok":true}'),
     };
   };
   const response = await studioGateway(
-    new Request("https://game.example/api/studio/quota", {
+    new Request("https://game.example/api/studio/health", {
       headers: {
         "x-vercel-forwarded-for": IP,
         "x-mint-ip": "192.0.2.1",
@@ -668,7 +705,7 @@ test("Vercel gateway forwards its trusted IP and blocks internal routes and cros
     { env, transport },
   );
   assert.equal(response.status, 200);
-  assert.equal((await response.json()).remaining, 3);
+  assert.deepEqual(await response.json(), { ok: true });
   assert.equal(
     (
       await studioGateway(

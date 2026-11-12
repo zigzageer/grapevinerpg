@@ -62,8 +62,6 @@ async function studioApi(page: Page) {
   }
   const jobs = new Map<string, GenerationJob>();
   const requests: Record<string, unknown>[] = [];
-  let used = 0;
-  const quota = () => ({ limit: 3, used, remaining: 3 - used });
   const artwork = readFileSync(
     new URL("../public/characters/miel.png", import.meta.url),
   );
@@ -77,7 +75,6 @@ async function studioApi(page: Page) {
         contentType: "application/json",
         body: JSON.stringify(body),
       });
-    if (path === "/quota") return json(quota());
     if (parts[0] === "games" && parts.length === 2)
       return json(games.get(parts[1]));
     if (parts[0] === "drafts") return json([]);
@@ -95,14 +92,8 @@ async function studioApi(page: Page) {
         ? json(jobs.get(parts[1]))
         : json({ error: "Generation not found." }, 404);
     if (path === "/generations") {
-      if (used >= 3)
-        return json(
-          { error: "This IP address has used all 3 generation attempts." },
-          429,
-        );
       const input = route.request().postDataJSON();
       requests.push(input);
-      used++;
       const id = input.characterId || `web-${input.requestId}`;
       const key = `${input.gameId}/${id}`;
       const versions = history.get(key) || {
@@ -137,7 +128,9 @@ async function studioApi(page: Page) {
         description: input.abilityOnly ? base!.description : input.description,
         image,
         source: "website",
-        createdAt: new Date(Date.UTC(2026, 10, 11, 12, used)).toISOString(),
+        createdAt: new Date(
+          Date.UTC(2026, 10, 11, 12, requests.length),
+        ).toISOString(),
       });
       history.set(key, versions);
       const job: GenerationJob = {
@@ -151,7 +144,6 @@ async function studioApi(page: Page) {
           image,
         },
         error: null,
-        quota: quota(),
       };
       jobs.set(job.id, job);
       return json({ ...job, status: "queued", result: null }, 202);
@@ -172,7 +164,7 @@ async function studioApi(page: Page) {
     }
     return json({ error: "Studio endpoint not found." }, 404);
   });
-  return { requests, games, history, quota };
+  return { requests, games, history };
 }
 
 async function openStudio(page: Page) {
@@ -217,9 +209,6 @@ test("a visitor can add themselves from an uploaded reference, preview, and join
   expect(api.games.get("mint")!.characters.some((c) => c.name === "Nova")).toBe(
     false,
   );
-  await expect(
-    page.getByText("2 of 3 attempts left", { exact: true }),
-  ).toBeVisible();
   await page.getByRole("button", { name: "Close dialog", exact: true }).click();
   await page.getByRole("button", { name: "Edit Miel", exact: true }).click();
   const mielEditor = page.getByRole("dialog", {
@@ -248,15 +237,27 @@ test("a visitor can add themselves from an uploaded reference, preview, and join
   ).toBeVisible();
 });
 
-test("Miel can refine her details, use all three attempts, and restore her original from history", async ({
+test("Miel can generate more than three edits and restore her original from history", async ({
   page,
 }) => {
   const api = await studioApi(page);
+  const sharedMiel = api.games
+    .get("mint")!
+    .characters.find((c) => c.id === "friend-8")!;
+  sharedMiel.preset = undefined;
+  const roster = page.waitForResponse("**/api/studio/games/mint");
   await page.goto("/");
+  await roster;
   await page.getByRole("button", { name: "Play as Mint", exact: true }).click();
   await page
     .getByRole("button", { name: "Choose characters", exact: true })
     .click();
+  await page.getByRole("button", { name: "Edit babashark", exact: true }).click();
+  await expect(
+    page.getByRole("dialog", { name: "Edit babashark", exact: true })
+      .getByRole("textbox", { name: "Appearance details", exact: true }),
+  ).toBeEnabled();
+  await page.getByRole("button", { name: "Close dialog", exact: true }).click();
   await page.getByRole("button", { name: "Edit Miel", exact: true }).click();
   await expect(page.getByRole("dialog", { name: "Edit Miel" })).toBeVisible();
   await expect(
@@ -274,22 +275,19 @@ test("Miel can refine her details, use all three attempts, and restore her origi
   await page
     .getByRole("button", { name: "Use this version", exact: true })
     .click();
-  for (let remaining = 1; remaining >= 0; remaining--) {
+  for (let version = 2; version <= 4; version++) {
     await page
       .getByRole("textbox", { name: "Appearance details", exact: true })
-      .fill(`Green coat, scarf variation ${remaining}`);
+      .fill(`Green coat, scarf variation ${version}`);
     await page.getByRole("button", { name: "Regenerate", exact: true }).click();
     await expect(
-      page.getByText(`${remaining} of 3 attempts left`, { exact: true }),
-    ).toBeVisible();
-    await expect(
       page.getByRole("button", { name: "Use this version", exact: true }),
-    ).toBeVisible();
+    ).toBeEnabled();
   }
   await expect(
     page.getByRole("button", { name: "Regenerate", exact: true }),
-  ).toBeDisabled();
-  expect(api.requests.length).toBe(3);
+  ).toBeEnabled();
+  expect(api.requests.length).toBe(4);
   expect(api.requests[0].characterId).toBe("friend-8");
   expect(api.requests[1].useCurrent).toBe(true);
   await page
@@ -299,7 +297,7 @@ test("Miel can refine her details, use all three attempts, and restore her origi
     name: "Character history",
     exact: true,
   });
-  await expect(history.locator(".studio-history-grid > button")).toHaveCount(4);
+  await expect(history.locator(".studio-history-grid > button")).toHaveCount(5);
   await history
     .getByRole("button")
     .filter({ hasText: "Original character" })
@@ -313,8 +311,7 @@ test("Miel can refine her details, use all three attempts, and restore her origi
   await expect(
     page.getByRole("button", { name: "Current version", exact: true }),
   ).toBeDisabled();
-  expect(api.quota().used).toBe(3);
-  expect(api.history.get("mint/friend-8")!.versions).toHaveLength(4);
+  expect(api.history.get("mint/friend-8")!.versions).toHaveLength(5);
   await page.getByRole("button", { name: "Close dialog", exact: true }).click();
   await expect(
     page.getByRole("button", { name: "Play as Mint", exact: true }),
@@ -395,7 +392,7 @@ test("an ability-only preview keeps the sprite and equips the move until history
     studio.getByRole("button", { name: "Current version", exact: true }),
   ).toBeDisabled();
   expect(api.games.get("mint")!.characters[0].ability).toBeUndefined();
-  expect(api.quota().used).toBe(1);
+  expect(api.requests).toHaveLength(1);
 });
 
 for (const viewport of [
@@ -411,9 +408,6 @@ for (const viewport of [
     await page
       .getByRole("button", { name: "Add character", exact: true })
       .click();
-    await expect(
-      page.getByText("3 of 3 attempts left", { exact: true }),
-    ).toBeVisible();
     await page
       .getByRole("textbox", { name: "Character name", exact: true })
       .fill("Mobile friend");

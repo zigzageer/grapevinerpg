@@ -71,10 +71,6 @@ export function createStudioServer({ service, secret, tls, verifyVercel }) {
           send(200, { ok: true });
           return;
         }
-        if (url.pathname === "/quota") {
-          send(200, service.quota(ip));
-          return;
-        }
         if (parts[0] === "games" && parts.length === 2) {
           send(200, await service.loadGame(parts[1]));
           return;
@@ -85,8 +81,7 @@ export function createStudioServer({ service, secret, tls, verifyVercel }) {
           parts[4] === "history" &&
           parts.length === 5
         ) {
-          service.game(parts[1]);
-          send(200, service.store.history(parts[1], parts[3]));
+          send(200, await service.history(parts[1], parts[3]));
           return;
         }
         if (parts[0] === "drafts" && parts.length === 2) {

@@ -10,11 +10,6 @@ export interface StudioGame {
   managedIds?: string[];
   managedVersions?: Record<string, string>;
 }
-export interface Quota {
-  limit: number;
-  used: number;
-  remaining: number;
-}
 export interface CharacterVersion {
   id: string;
   character: Character;
@@ -34,7 +29,6 @@ export interface GenerationJob {
   status: "queued" | "running" | "succeeded" | "failed";
   result: { character: Character; versionId: string; image: string | null } | null;
   error: string | null;
-  quota: Quota;
 }
 
 export const studioAvailable = () =>

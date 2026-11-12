@@ -1380,12 +1380,7 @@ body {
   color: #31543b;
   border-color: #bacbad;
 }
-.studio-quota {
-  color: #426452;
-  font-size: 13px;
-  font-weight: 700;
-}
-.studio-allowance {
+.studio-intro {
   color: #6c756d;
   font-size: 12px;
   line-height: 1.6;
@@ -1692,7 +1687,7 @@ body {
   .studio-stage-empty {
     height: 125px;
   }
-  .studio-allowance {
+  .studio-intro {
     margin-bottom: 16px;
   }
   .studio-history-grid {

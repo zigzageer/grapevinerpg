@@ -706,9 +706,9 @@ test("pause settings control the TV treatment and camera without leaking input",
 test("workshop editing and a new playable character persist", async ({
   page,
 }) => {
-  await page.route("**/api/studio/games/mint", (route) =>
-    route.fulfill({ status: 503, json: { error: "Unavailable" } }),
-  );
+  await page.addInitScript(() => {
+    Object.assign(globalThis, { __MINT_ART__: {} });
+  });
   await page.goto("/");
   await startAsMint(page);
   const choices = await picker(page);

@@ -19,7 +19,6 @@ import {
   type CharacterHistory,
   type CharacterVersion,
   type GenerationJob,
-  type Quota,
   type StudioGame,
 } from "../game/studio";
 
@@ -59,7 +58,6 @@ export function CharacterStudio({
 }: Props) {
   const [game, setGame] = useState<StudioGame | null>(null);
   const [drafts, setDrafts] = useState<Character[]>([]);
-  const [quota, setQuota] = useState<Quota | null>(null);
   const [selectedId, setSelectedId] = useState(initialCharacter?.id ?? "");
   const [name, setName] = useState(initialCharacter?.name || "");
   const [description, setDescription] = useState("");
@@ -97,8 +95,7 @@ export function CharacterStudio({
     applying ||
     loadingHistory ||
     (editing && !history) ||
-    !game ||
-    !quota;
+    !game;
 
   const loadCharacter = useCallback(
     async (character: Character, preferredVersion?: string) => {
@@ -151,7 +148,6 @@ export function CharacterStudio({
         undefined,
         controller.signal,
       ),
-      studioRequest<Quota>("/quota", undefined, controller.signal),
       initialCharacter
         ? Promise.resolve([])
         : studioRequest<Character[]>(
@@ -161,18 +157,13 @@ export function CharacterStudio({
           ),
     ]).then((results) => {
       if (disposed) return;
-      const [town, allowance, savedDrafts] = results;
+      const [town, savedDrafts] = results;
       if (town.status === "fulfilled") setGame(town.value);
       else
         setError(
           town.reason instanceof Error
             ? town.reason.message
             : "The character studio could not load.",
-        );
-      if (allowance.status === "fulfilled") setQuota(allowance.value);
-      else
-        setError(
-          "Generation allowance could not be checked. Try reconnecting.",
         );
       if (savedDrafts.status === "fulfilled") setDrafts(savedDrafts.value);
       try {
@@ -212,7 +203,6 @@ export function CharacterStudio({
           return;
         }
         setJob(next);
-        setQuota(next.quota);
         if (next.status === "succeeded" && next.result) {
           setPendingId(null);
           const character = next.result.character;
@@ -318,12 +308,7 @@ export function CharacterStudio({
   const generate = async (event: React.FormEvent) => {
     event.preventDefault();
     const prompt = abilityPrompt.trim();
-    if (
-      formDisabled ||
-      (moveOnly && (!preview || !prompt)) ||
-      !quota?.remaining
-    )
-      return;
+    if (formDisabled || (moveOnly && (!preview || !prompt))) return;
     setSubmitting(true);
     setError("");
     setMessage("");
@@ -351,7 +336,6 @@ export function CharacterStudio({
       } catch {
         /* The server retains the generation and history. */
       }
-      setQuota(next.quota);
       setJob(next);
       setPendingId(next.id);
     } catch (e) {
@@ -366,12 +350,8 @@ export function CharacterStudio({
         } catch {
           /* Optional device storage. */
         }
-        setQuota(accepted.quota);
         setJob(accepted);
         setPendingId(accepted.id);
-      } else {
-        const next = await studioRequest<Quota>("/quota").catch(() => null);
-        if (next) setQuota(next);
       }
     } finally {
       setSubmitting(false);
@@ -415,15 +395,9 @@ export function CharacterStudio({
       onClose={onClose}
       wide
     >
-      <span className="studio-quota" aria-live="polite">
-        {quota
-          ? `${quota.remaining} of ${quota.limit} attempts left`
-          : "Checking attempts…"}
-      </span>
-      <p className="studio-allowance">
-        Three generation attempts per IP across all towns. An appearance and a
-        signature ability can share one attempt. Restoring a saved version is
-        free.
+      <p className="studio-intro">
+        You can generate an appearance and a signature ability together.
+        Earlier versions are saved in character history.
       </p>
       <div className="studio-layout">
         <form className="studio-form" onSubmit={generate}>
@@ -541,10 +515,7 @@ export function CharacterStudio({
             <button
               className="button primary studio-generate"
               type="submit"
-              disabled={
-                !quota?.remaining ||
-                (moveOnly ? !abilityPrompt.trim() : !name.trim())
-              }
+              disabled={moveOnly ? !abilityPrompt.trim() : !name.trim()}
             >
               {busy ? (
                 <LoaderCircle size={17} className="studio-spinning" />
@@ -649,12 +620,12 @@ export function CharacterStudio({
           {error}
         </p>
       )}
-      {(!game || !quota || (editing && !loadingHistory && !history)) && (
+      {(!game || (editing && !loadingHistory && !history)) && (
         <button
           className="button secondary"
           onClick={() => {
             setError("");
-            if (game && quota && selectedDraft)
+            if (game && selectedDraft)
               void loadCharacter(selectedDraft);
             else setReload((old) => old + 1);
           }}
