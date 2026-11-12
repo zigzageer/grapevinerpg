@@ -4,7 +4,7 @@ const gameId = "(?:mint|[0-9]{17,20})";
 const characterId = "[A-Za-z0-9_-]{1,80}";
 const uuid = "[a-f0-9-]{36}";
 const readRoute = new RegExp(
-  `^/(?:health|drafts/${gameId}|games/${gameId}|games/${gameId}/characters/${characterId}/history|jobs/${uuid}|assets/${uuid}\\.png)$`,
+  `^/(?:health|drafts/${gameId}|games/${gameId}|games/${gameId}/characters/${characterId}/history|jobs/${uuid}|matches/${uuid}|assets/${uuid}\\.png)$`,
 );
 const writeRoute = new RegExp(
   `^/(?:generations|games/${gameId}/characters/${characterId}/apply)$`,

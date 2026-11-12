@@ -170,6 +170,8 @@ export class StudioStore {
       !/^[a-z0-9-]+$/.test(game.slug) ||
       !game.slug.endsWith(`-${gameId}`) ||
       !Number.isFinite(Date.parse(game.updatedAt)) ||
+      (game.town !== undefined &&
+        game.town?.path !== `/games/${gameId}/town.json`) ||
       !Array.isArray(game.characters) ||
       game.characters.length > SERVER_CREW_LIMIT ||
       new Set(game.characters.map((character) => character?.id)).size !==

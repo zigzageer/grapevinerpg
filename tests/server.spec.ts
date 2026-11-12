@@ -1,5 +1,8 @@
 import { test, expect } from "@playwright/test";
 import { DEFAULT_CREW } from "../src/game/model";
+import sampleGame from "../examples/server-town/game.json" with { type: "json" };
+import sampleTown from "../examples/server-town/town.json" with { type: "json" };
+import type { MatchSnapshot } from "../src/game/matches";
 const GUILD = "123456789012345678",
   OTHER = "223456789012345678",
   USER = "323456789012345678";
@@ -43,7 +46,9 @@ test("empty server stays empty and becomes playable when a new character publish
   await page.keyboard.press("d");
   game = { ...game, updatedAt: "2026-01-02", characters: [character()] };
   await page.getByRole("button", { name: "Check for updates" }).click();
-  await expect(page.getByRole("dialog", { name: "Choose a character" })).toBeVisible();
+  await expect(
+    page.getByRole("dialog", { name: "Choose a character" }),
+  ).toBeVisible();
   await expect(page.getByTestId("player-sprite")).toHaveCount(0);
   await expect(
     page
@@ -85,7 +90,9 @@ test("server saves are isolated from Mint and other servers; later roster update
     }),
   );
   await page.goto(`/${game.slug}`);
-  await page.getByRole("button", { name: "Play as Server Bob", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Play as Server Bob", exact: true })
+    .click();
   await expect(page.getByTestId("active-character-name")).toHaveText(
     "Server Bob",
   );
@@ -129,7 +136,9 @@ test("server saves are isolated from Mint and other servers; later roster update
     Number(await page.getByTestId("player-sprite").getAttribute("data-x")),
   ).toBeCloseTo(x, 0);
   await page.goto(`/test-lounge-${OTHER}`);
-  await page.getByRole("button", { name: "Play as Other Bob", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Play as Other Bob", exact: true })
+    .click();
   await expect(page.getByTestId("active-character-name")).toHaveText(
     "Other Bob",
   );
@@ -164,6 +173,157 @@ test("an unpublished server link shows a retry instead of the Mint roster", asyn
   await expect(page.getByTestId("player-sprite")).toHaveCount(0);
 });
 
+test("a guild manifest loads its own town and walks to its landmarks", async ({
+  page,
+}) => {
+  await page.route(`**/api/studio/games/${GUILD}`, (route) =>
+    route.fulfill({ json: { ...sampleGame, characters: [character()] } }),
+  );
+  await page.route(`**${sampleGame.town.path}`, (route) =>
+    route.fulfill({ json: sampleTown }),
+  );
+  await page.route(`**/games/${GUILD}/${USER}.png`, (route) =>
+    route.fulfill({
+      path: "public/characters/david.png",
+      contentType: "image/png",
+    }),
+  );
+  await page.goto(`/${sampleGame.slug}`);
+  await page
+    .getByRole("button", { name: "Play as Server Bob", exact: true })
+    .click();
+  await expect(page.getByTestId("server-town-scenery")).toBeVisible();
+  const sprite = page.getByTestId("player-sprite");
+  await expect(sprite).toHaveAttribute("data-x", String(sampleTown.spawn.x));
+  await page.getByRole("button", { name: "Town map", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Walk to Station Hall", exact: true })
+    .click();
+  await expect(sprite).toHaveAttribute("data-x", "460", { timeout: 10000 });
+  await expect(sprite).toHaveAttribute("data-y", "414");
+});
+
+test("Grapevine is playable with the existing cast and its own destinations", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.route("**/api/studio/games/mint", (route) =>
+    route.fulfill({ status: 404, json: {} }),
+  );
+  await page.goto("/grapevine");
+  const picker = page.getByRole("dialog", { name: "Choose a clan member" });
+  await expect(
+    picker.getByRole("button", { name: "Play as babashark", exact: true }),
+  ).toBeVisible();
+  await expect(
+    picker.getByRole("button", { name: "Edit Miel", exact: true }),
+  ).toBeVisible();
+  await picker
+    .getByRole("button", { name: "Play as Mint", exact: true })
+    .click();
+  await expect(page.getByTestId("server-town-scenery")).toBeVisible();
+  await expect(page.getByTestId("player-sprite")).toHaveAttribute(
+    "data-x",
+    "850",
+  );
+  await page.getByRole("button", { name: "Town map", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Walk to Looksmaxxing Gym", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", {
+      name: "Walk to Netanyahu Press Room",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Walk to Iranian Bazaar", exact: true }),
+  ).toBeVisible();
+});
+
+test("the battle page reads the signup and steps through the finished replay", async ({
+  page,
+}) => {
+  const id = "00000000-1000-4000-8000-000000000001";
+  const now = Date.now();
+  let match: MatchSnapshot = {
+    id,
+    kind: "war",
+    status: "signup",
+    createdAt: now,
+    joinUntil: now + 120000,
+    minPlayersPerSide: 1,
+    winnerSide: null,
+    reason: null,
+    turnFighterId: null,
+    replayUrl: `/wars/${id}`,
+    events: [],
+    sides: [
+      {
+        guildId: GUILD,
+        name: "Grapevine",
+        players: [
+          {
+            id: "fighter-a",
+            name: "Mint",
+            sprite: null,
+            ability: "Power Strike",
+            hp: 100,
+            abilityUsed: false,
+          },
+        ],
+      },
+      {
+        guildId: OTHER,
+        name: "Signal Yard",
+        players: [
+          {
+            id: "fighter-b",
+            name: "Bob",
+            sprite: null,
+            ability: "Power Strike",
+            hp: 100,
+            abilityUsed: false,
+          },
+        ],
+      },
+    ],
+  };
+  await page.route(`**/api/studio/matches/${id}`, (route) =>
+    route.fulfill({ json: match }),
+  );
+  await page.goto(`/wars/${id}`);
+  await expect(page.getByText("Signup open", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("Join in Discord. 1 needed per side."),
+  ).toBeVisible();
+  match = {
+    ...match,
+    status: "finished",
+    winnerSide: 0,
+    events: [
+      {
+        seq: 1,
+        kind: "knockout",
+        actorId: "fighter-a",
+        targetId: "fighter-b",
+        move: "Power Strike",
+        damage: 100,
+        targetHp: 0,
+      },
+    ],
+  };
+  match.sides[1].players[0].hp = 0;
+  await expect(page.getByText("Grapevine wins", { exact: true })).toBeVisible({
+    timeout: 8000,
+  });
+  const hp = page.getByRole("meter", { name: "Bob health" });
+  await expect(hp).toHaveAttribute("value", "0");
+  await page.getByRole("button", { name: "Play replay", exact: true }).click();
+  await expect(hp).toHaveAttribute("value", "100");
+  await expect(hp).toHaveAttribute("value", "0");
+});
+
 for (const viewport of [
   { width: 390, height: 844 },
   { width: 844, height: 390 },
@@ -176,7 +336,9 @@ for (const viewport of [
       route.fulfill({ json: { ...makeGame(), characters: [character()] } }),
     );
     await page.goto(`/test-lounge-${GUILD}`);
-    await page.getByRole("button", { name: "Play as Server Bob", exact: true }).click();
+    await page
+      .getByRole("button", { name: "Play as Server Bob", exact: true })
+      .click();
     await expect(page.getByTestId("active-character-name")).toHaveText(
       "Server Bob",
     );

@@ -1,13 +1,17 @@
-import { canStand, OBSTACLES, type Point } from "./model";
-import { WALK_BOUNDS } from "./locations";
+import {
+  canStand,
+  MINT_WALK_AREA,
+  type Point,
+  type WalkArea,
+} from "./model.ts";
 const STEP = 20;
 const key = (p: Point) => `${p.x},${p.y}`;
 const same = (a: Point, b: Point) => a.x === b.x && a.y === b.y;
-function clearLine(a: Point, b: Point) {
-  if (!canStand(a) || !canStand(b)) return false;
+function clearLine(a: Point, b: Point, area: WalkArea) {
+  if (!canStand(a, area) || !canStand(b, area)) return false;
   // Intersect the full segment with each padded footprint. Sampling can miss a
   // narrow slice of a corner and leave an auto-walking character stuck there.
-  return !OBSTACLES.some((r) => {
+  return !area.obstacles.some((r) => {
     let enter = 0,
       leave = 1;
     const axes = [
@@ -28,18 +32,18 @@ function clearLine(a: Point, b: Point) {
     return leave - enter > 1e-10;
   });
 }
-const nodes: Point[] = [];
-for (
-  let y = Math.ceil(WALK_BOUNDS.top / STEP) * STEP;
-  y <= WALK_BOUNDS.bottom;
-  y += STEP
-)
-  for (
-    let x = Math.ceil(WALK_BOUNDS.left / STEP) * STEP;
-    x <= WALK_BOUNDS.right;
-    x += STEP
-  )
-    if (canStand({ x, y })) nodes.push({ x, y });
+const walkGrids = new WeakMap<WalkArea, Point[]>();
+function walkGrid(area: WalkArea) {
+  const cached = walkGrids.get(area);
+  if (cached) return cached;
+  const { left, right, top, bottom } = area.bounds;
+  const nodes: Point[] = [];
+  for (let y = Math.ceil(top / STEP) * STEP; y <= bottom; y += STEP)
+    for (let x = Math.ceil(left / STEP) * STEP; x <= right; x += STEP)
+      if (canStand({ x, y }, area)) nodes.push({ x, y });
+  walkGrids.set(area, nodes);
+  return nodes;
+}
 
 /** Keep long trips responsive on phones without sorting the entire frontier. */
 class Frontier {
@@ -75,27 +79,40 @@ class Frontier {
     return first;
   }
 }
-export function findPath(start: Point, requested: Point): Point[] {
+export function findPath(
+  start: Point,
+  requested: Point,
+  area = MINT_WALK_AREA,
+): Point[] {
   if (
-    !canStand(start) ||
+    !canStand(start, area) ||
     !Number.isFinite(requested.x) ||
     !Number.isFinite(requested.y)
   )
     return [];
+  const { left, right, top, bottom } = area.bounds;
   const bounded = {
-    x: Math.max(WALK_BOUNDS.left, Math.min(WALK_BOUNDS.right, requested.x)),
-    y: Math.max(WALK_BOUNDS.top, Math.min(WALK_BOUNDS.bottom, requested.y)),
+    x: Math.max(left, Math.min(right, requested.x)),
+    y: Math.max(top, Math.min(bottom, requested.y)),
   };
-  if (canStand(bounded) && clearLine(start, bounded)) return [bounded];
-  const nearest = (p: Point) =>
-    nodes.reduce((a, b) =>
-      Math.hypot(a.x - p.x, a.y - p.y) < Math.hypot(b.x - p.x, b.y - p.y)
-        ? a
-        : b,
-    );
-  const from = nearest(start),
-    to = nearest(bounded);
-  if (!clearLine(start, from)) return [];
+  const validTarget = canStand(bounded, area);
+  if (validTarget && clearLine(start, bounded, area)) return [bounded];
+  const nodes = walkGrid(area);
+  const nearest = (p: Point, requireLine: boolean) => {
+    let nearestPoint: Point | undefined;
+    let distance = Infinity;
+    for (const node of nodes) {
+      const candidate = (node.x - p.x) ** 2 + (node.y - p.y) ** 2;
+      if (candidate < distance && (!requireLine || clearLine(p, node, area))) {
+        nearestPoint = node;
+        distance = candidate;
+      }
+    }
+    return nearestPoint;
+  };
+  const from = nearest(start, true),
+    to = nearest(bounded, validTarget);
+  if (!from || !to) return [];
   const open = new Frontier(),
     costs = new Map([[key(from), 0]]),
     parents = new Map<string, Point>();
@@ -117,7 +134,7 @@ export function findPath(start: Point, requested: Point): Point[] {
         if (!dx && !dy) continue;
         const next = { x: current.x + dx, y: current.y + dy },
           nk = key(next);
-        if (!canStand(next) || !clearLine(current, next)) continue;
+        if (!canStand(next, area) || !clearLine(current, next, area)) continue;
         const nextCost = cost + Math.hypot(dx, dy);
         if (nextCost >= (costs.get(nk) ?? Infinity)) continue;
         costs.set(nk, nextCost);
@@ -136,14 +153,14 @@ export function findPath(start: Point, requested: Point): Point[] {
     p = parents.get(key(p))!;
     path.unshift(p);
   }
-  if (canStand(bounded) && clearLine(to, bounded)) path.push(bounded);
+  if (validTarget && !same(to, bounded)) path.push(bounded);
   // Keep only turns with a clear segment between them. Following every grid
   // point adds stop/start frames and makes distant destinations needlessly slow.
   const full = [start, ...path],
     turns: Point[] = [];
   for (let i = 0; i < full.length - 1; ) {
     let next = full.length - 1;
-    while (next > i + 1 && !clearLine(full[i], full[next])) next--;
+    while (next > i + 1 && !clearLine(full[i], full[next], area)) next--;
     turns.push(full[next]);
     i = next;
   }

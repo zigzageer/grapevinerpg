@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import type { Character, Point, SaveGame } from "./game/model";
 import {
+  canStand,
   characterKey,
   createCrewMember,
   DEFAULT_CREW,
@@ -55,6 +56,16 @@ import { TownMap } from "./components/TownMap";
 import { TOWN_NAME, districtAt } from "./game/locations";
 import { ServerLoader } from "./components/ServerLoader";
 import { loadServerSave, serverSaveKey, type ServerGame } from "./game/server";
+import {
+  parseServerTown,
+  serverDistrictAt,
+  type ServerTown,
+} from "./game/server-town";
+import sampleGame from "../examples/server-town/game.json";
+import sampleTown from "../examples/server-town/town.json";
+import grapevineTown from "./game/data/grapevine-town.json";
+import { MatchReplay } from "./components/MatchReplay";
+import { matchIdFromPath } from "./game/matches";
 
 type Panel =
   | "characters"
@@ -66,8 +77,13 @@ type Panel =
   | "pause"
   | "map"
   | null;
-function loadDemo(): SaveGame {
-  const saved = loadSave();
+function loadDemo(saveKey = SAVE_KEY, town?: ServerTown): SaveGame {
+  const saved = loadSave(
+    saveKey,
+    town?.walkArea,
+    town?.spawn,
+    town ? SAVE_KEY : undefined,
+  );
   const crew = saved.crew.filter(
     (c) => c.preset || c.sprite || !["Friend 01", "Friend 02"].includes(c.name),
   );
@@ -79,19 +95,60 @@ function loadDemo(): SaveGame {
 }
 
 export default function App() {
+  const matchId = matchIdFromPath(window.location.pathname);
+  if (matchId) return <MatchReplay id={matchId} />;
+  if (/^\/grapevine\/?$/.test(window.location.pathname))
+    return (
+      <Game town={parseServerTown(grapevineTown, grapevineTown.guildId)} />
+    );
+  if (/^\/town-preview\/?$/.test(window.location.pathname)) {
+    const server: ServerGame = {
+      ...sampleGame,
+      version: 1,
+      characters: DEFAULT_CREW.filter(
+        (c) => c.kind === "mint" || c.preset,
+      ).slice(0, 4),
+    };
+    return (
+      <Game
+        server={server}
+        town={parseServerTown(sampleTown, server.guildId)}
+        preview
+      />
+    );
+  }
   return (
     <ServerLoader>
-      {(server) => <Game key={server?.guildId || "mint"} server={server} />}
+      {(server, town) => (
+        <Game key={server?.guildId || "mint"} server={server} town={town} />
+      )}
     </ServerLoader>
   );
 }
 
-function Game({ server }: { server?: ServerGame }) {
-  const saveKey = server ? serverSaveKey(server.guildId) : SAVE_KEY;
-  const title = server?.name || "Adventures of Mint";
-  const townName = server?.name || TOWN_NAME;
+function Game({
+  server,
+  town,
+  preview = false,
+}: {
+  server?: ServerGame;
+  town?: ServerTown;
+  preview?: boolean;
+}) {
+  const clan = !!town && !server;
+  const saveKey = preview
+    ? "grapevine.town-preview.v1"
+    : server
+      ? serverSaveKey(server.guildId)
+      : clan
+        ? "grapevine.clan.v1"
+        : SAVE_KEY;
+  const versionScope = clan ? saveKey : undefined;
+  const title = clan ? "Grapevine Clan" : server?.name || "Adventures of Mint";
+  const townName = town?.name || server?.name || TOWN_NAME;
+  const spawn = town?.spawn ?? START;
   const [game, setGame] = useState(() =>
-      server ? loadServerSave(server) : loadDemo(),
+      server ? loadServerSave(server, town, saveKey) : loadDemo(saveKey, town),
     ),
     [player, setPlayer] = useState<Point>(game.player);
   const [moving, setMoving] = useState(false),
@@ -105,14 +162,18 @@ function Game({ server }: { server?: ServerGame }) {
     actor: Character;
     other: Character;
   } | null>(null);
-  const [conversation, setConversation] =
-    useState<ResidentConversation | null>(null);
-  const [zoom, setZoom] = useState(DEFAULT_ZOOM),
+  const [conversation, setConversation] = useState<ResidentConversation | null>(
+    null,
+  );
+  const defaultZoom = clan ? 2 : DEFAULT_ZOOM;
+  const [zoom, setZoom] = useState(defaultZoom),
     [toast, setToast] = useState(""),
     [saved, setSaved] = useState<"saved" | "failed">("saved"),
     [running, setRunning] = useState(false),
     [inputReset, setInputReset] = useState(0);
   const position = useRef(player),
+    walkArea = useRef(town?.walkArea),
+    lastWalkArea = useRef(town?.walkArea),
     keys = useRef(new Set<string>()),
     stick = useRef<Point>({ x: 0, y: 0 }),
     path = useRef<Point[]>([]),
@@ -130,6 +191,7 @@ function Game({ server }: { server?: ServerGame }) {
     viewport.width / viewport.height,
     zoom,
     viewport.height,
+    town,
   );
   const selectRef = useRef<(direction: number) => void>(() => {}),
     openRef = useRef<(p: Exclude<Panel, null>) => void>(() => {});
@@ -137,7 +199,8 @@ function Game({ server }: { server?: ServerGame }) {
   const activeKey = active?.id ?? "";
   const panel = openPanel ?? (active ? null : "characters");
   const tvLook = game.tvLook !== false;
-  const canUseStudio = studioAvailable();
+  const canUseStudio = !preview && studioAvailable();
+  walkArea.current = town?.walkArea;
   state.current = game;
   blocked.current = !!panel;
   const notify = useCallback((message: string) => {
@@ -203,13 +266,16 @@ function Game({ server }: { server?: ServerGame }) {
       setPanel("studio");
     } else if (game.crew.length < MINT_CREW_LIMIT) {
       const character = createCrewMember(game.crew.length);
-      setGame((current) => ({ ...current, crew: [...current.crew, character] }));
+      setGame((current) => ({
+        ...current,
+        crew: [...current.crew, character],
+      }));
       setEditorCharacter(character);
       setPanel("crew");
     }
   };
   const walkTo = (point: Point) => {
-    const route = findPath(position.current, point);
+    const route = findPath(position.current, point, walkArea.current);
     if (!route.length) {
       notify("Try the path around it.");
       return;
@@ -226,11 +292,19 @@ function Game({ server }: { server?: ServerGame }) {
   }, []);
   const resetPosition = () => {
     stop();
-    position.current = { ...START };
-    setPlayer({ ...START });
-    setZoom(DEFAULT_ZOOM);
+    position.current = { ...spawn };
+    setPlayer(position.current);
+    setZoom(defaultZoom);
     setPanel(null);
   };
+  useEffect(() => {
+    const changed = lastWalkArea.current !== town?.walkArea;
+    lastWalkArea.current = town?.walkArea;
+    if (!changed && canStand(position.current, town?.walkArea)) return;
+    stop();
+    position.current = { ...spawn };
+    setPlayer(position.current);
+  }, [spawn, stop, town]);
   useEffect(() => {
     if (!server) return;
     setGame((g) => ({
@@ -257,12 +331,12 @@ function Game({ server }: { server?: ServerGame }) {
         )
           return;
         sharedUpdatedAt.current = Date.parse(shared.updatedAt);
-        const applied = readAppliedVersions();
+        const applied = readAppliedVersions(versionScope);
         setGame((current) => {
           const crew = mergeStudioCrew(current.crew, shared, applied);
           return crew === current.crew ? current : { ...current, crew };
         });
-        rememberAppliedVersions(shared);
+        rememberAppliedVersions(shared, versionScope);
       } catch {
         /* The existing cast and browser saves remain playable during a connection failure. */
       }
@@ -277,7 +351,7 @@ function Game({ server }: { server?: ServerGame }) {
       clearInterval(interval);
       window.removeEventListener("focus", refresh);
     };
-  }, [server?.guildId]);
+  }, [server?.guildId, versionScope]);
   useEffect(() => {
     const measure = () => {
       const box = viewportRef.current?.getBoundingClientRect();
@@ -359,6 +433,7 @@ function Game({ server }: { server?: ServerGame }) {
           position.current,
           (dx / divisor) * travel,
           (dy / divisor) * travel,
+          walkArea.current,
         );
         changed =
           next.x !== position.current.x || next.y !== position.current.y;
@@ -454,7 +529,7 @@ function Game({ server }: { server?: ServerGame }) {
       try {
         localStorage.setItem(
           saveKey,
-          JSON.stringify({ ...game, player }),
+          JSON.stringify({ ...game, player, layoutGuildId: town?.guildId }),
         );
         setSaved("saved");
       } catch {
@@ -462,13 +537,17 @@ function Game({ server }: { server?: ServerGame }) {
       }
     }, 350);
     return () => clearTimeout(timeout);
-  }, [game, player, saveKey]);
+  }, [game, player, saveKey, town?.guildId]);
   useEffect(() => {
     const save = () => {
       try {
         localStorage.setItem(
           saveKey,
-          JSON.stringify({ ...state.current, player: position.current }),
+          JSON.stringify({
+            ...state.current,
+            player: position.current,
+            layoutGuildId: town?.guildId,
+          }),
         );
       } catch {
         setSaved("failed");
@@ -484,7 +563,7 @@ function Game({ server }: { server?: ServerGame }) {
       document.removeEventListener("visibilitychange", hidden);
       clearTimeout(timer.current);
     };
-  }, [saveKey]);
+  }, [saveKey, town?.guildId]);
   const canFullscreen =
     typeof document.documentElement.requestFullscreen === "function" &&
     document.fullscreenEnabled;
@@ -526,9 +605,10 @@ function Game({ server }: { server?: ServerGame }) {
               activeKey={activeKey}
               target={target}
               townName={townName}
+              serverTown={town}
               paused={!!panel}
               onTalk={
-                server
+                server || town
                   ? undefined
                   : (dialogue) => {
                       setConversation(dialogue);
@@ -614,7 +694,9 @@ function Game({ server }: { server?: ServerGame }) {
           </header>
           <div className="hud-location">
             <span>{townName.toUpperCase()} · FREE ROAM</span>
-            <strong>{districtAt(player)}</strong>
+            <strong>
+              {town ? serverDistrictAt(town, player) : districtAt(player)}
+            </strong>
             <span className="location-rule" />
           </div>
           <div className="hud-keytips" aria-hidden="true">
@@ -672,7 +754,7 @@ function Game({ server }: { server?: ServerGame }) {
       )}
       {panel === "characters" && (
         <Modal
-          title="Choose a character"
+          title={clan ? "Choose a clan member" : "Choose a character"}
           className="game-modal character-picker-modal"
           onClose={active ? () => setPanel(null) : undefined}
           wide
@@ -688,15 +770,17 @@ function Game({ server }: { server?: ServerGame }) {
                 onChange={(e) => setSearch(e.target.value)}
               />
             </label>
-            <button
-              className="button primary picker-add"
-              aria-label="Add character"
-              title="Add character"
-              disabled={!canUseStudio && game.crew.length >= MINT_CREW_LIMIT}
-              onClick={addCharacter}
-            >
-              <Plus size={21} aria-hidden="true" />
-            </button>
+            {!preview && (
+              <button
+                className="button primary picker-add"
+                aria-label="Add character"
+                title="Add character"
+                disabled={!canUseStudio && game.crew.length >= MINT_CREW_LIMIT}
+                onClick={addCharacter}
+              >
+                <Plus size={21} aria-hidden="true" />
+              </button>
+            )}
           </div>
           <div
             className="picker-grid"
@@ -723,14 +807,16 @@ function Game({ server }: { server?: ServerGame }) {
                       </span>
                     )}
                   </button>
-                  <button
-                    className="picker-edit"
-                    aria-label={`Edit ${c.name}`}
-                    title={`Edit ${c.name}`}
-                    onClick={() => editCharacter(c)}
-                  >
-                    <Pencil size={15} aria-hidden="true" />
-                  </button>
+                  {!preview && (
+                    <button
+                      className="picker-edit"
+                      aria-label={`Edit ${c.name}`}
+                      title={`Edit ${c.name}`}
+                      onClick={() => editCharacter(c)}
+                    >
+                      <Pencil size={15} aria-hidden="true" />
+                    </button>
+                  )}
                 </div>
               );
             })}
@@ -751,6 +837,7 @@ function Game({ server }: { server?: ServerGame }) {
         <TownMap
           player={player}
           townName={townName}
+          serverTown={town}
           onClose={() => setPanel(null)}
           onWalk={(point) => {
             setPanel(null);
@@ -776,6 +863,12 @@ function Game({ server }: { server?: ServerGame }) {
               <span>Choose character</span>
               <ChevronRight size={17} />
             </button>
+            {!server && canUseStudio && (
+              <a className="button secondary" href={clan ? "/" : "/grapevine"}>
+                <MapPin size={18} />
+                {clan ? "Visit Adventures of Mint" : "Visit Grapevine Clan"}
+              </a>
+            )}
             {!server && (
               <button onClick={openWorkshop}>
                 <Pencil size={19} />
@@ -837,7 +930,7 @@ function Game({ server }: { server?: ServerGame }) {
           onClose={() => setPanel("characters")}
           onPublished={(shared, characterId) => {
             sharedUpdatedAt.current = Date.parse(shared.updatedAt);
-            const applied = readAppliedVersions();
+            const applied = readAppliedVersions(versionScope);
             delete applied[characterId];
             setGame((current) => ({
               ...current,
@@ -846,7 +939,7 @@ function Game({ server }: { server?: ServerGame }) {
                 : mergeStudioCrew(current.crew, shared, applied),
             }));
             if (!server) {
-              rememberAppliedVersions(shared);
+              rememberAppliedVersions(shared, versionScope);
             }
             notify("Character saved.");
           }}
@@ -916,7 +1009,7 @@ function Game({ server }: { server?: ServerGame }) {
               <span>
                 <strong>Mouse & touch</strong>Click or tap the ground to walk
                 there. Tap a cast member for actions
-                {server ? "." : ", or a resident to talk."}
+                {server || town ? "." : ", or a resident to talk."}
               </span>
             </p>
             <p>

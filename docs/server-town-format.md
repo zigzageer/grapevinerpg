@@ -16,3 +16,7 @@ The bot publishes a server town as data and optional artwork. The website turns 
 - Use unique IDs across buildings and landmarks. Keep the player spawn, each door and landmark, and all character spawn points reachable from one another. Supply up to 24 character spawn points. The sample uses 12 and the renderer reuses them when needed.
 - The palette uses six-digit hex colors. Each building kind has a built-in facade. Optional `art` is a same-guild PNG or WebP path such as `/games/<guildId>/town/record-shop.webp`. Keep generated building art free of labels so the game can render them clearly.
 - The sample guild ID is a placeholder. Replace it in both files and all asset paths when generating a town for a real server.
+
+Validate the sample locally with `node --experimental-strip-types scripts/validate-town.mjs examples/server-town/town.json`. The validator uses the same bounds, collision, and walking routes as the game. Open `/town-preview` to explore Signal Yard with sample characters.
+
+The game accepts bot metadata such as `botJobs` on the roster manifest and `discordUserId` on characters. Match ownership uses the existing `discord-<userId>` character ID.

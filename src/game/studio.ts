@@ -100,10 +100,10 @@ export function mergeStudioCrew(
 }
 
 const APPLIED_VERSIONS_KEY = "mint.studio.applied.v1";
-export function readAppliedVersions(): Record<string, string> {
+export function readAppliedVersions(scope?: string): Record<string, string> {
   try {
     const value = JSON.parse(
-      localStorage.getItem(APPLIED_VERSIONS_KEY) || "{}",
+      localStorage.getItem(scope ? `${APPLIED_VERSIONS_KEY}.${scope}` : APPLIED_VERSIONS_KEY) || "{}",
     );
     return value && typeof value === "object" && !Array.isArray(value)
       ? value
@@ -112,11 +112,11 @@ export function readAppliedVersions(): Record<string, string> {
     return {};
   }
 }
-export function rememberAppliedVersions(game: StudioGame) {
+export function rememberAppliedVersions(game: StudioGame, scope?: string) {
   try {
     localStorage.setItem(
-      APPLIED_VERSIONS_KEY,
-      JSON.stringify({ ...readAppliedVersions(), ...game.managedVersions }),
+      scope ? `${APPLIED_VERSIONS_KEY}.${scope}` : APPLIED_VERSIONS_KEY,
+      JSON.stringify({ ...readAppliedVersions(scope), ...game.managedVersions }),
     );
   } catch {
     /* Gameplay and shared history remain available when device storage is full. */

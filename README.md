@@ -8,6 +8,8 @@ Click a cast member in town to **Fight**, **Kiss**, or **Play as** them. Duels t
 
 Each Discord server can have its own empty town and cast. The `/game create` and `/game add` bot modules use the VPS Codex CLI and its saved ChatGPT login to generate characters from server nicknames, avatars, descriptions, and uploaded references. The bot publishes its roster and artwork through GitHub and Vercel. See [bot integration and setup](docs/discord-games.md).
 
+Visit **Grapevine Clan** from the pause menu or open `/grapevine` to play the existing cast in its own town. Open `/town-preview` to explore the Signal Yard sample. Discord towns can publish their own [town layouts](docs/server-town-format.md), and the [match service](docs/server-wars-api.md) provides server-war signups, Discord duels, and browser replays.
+
 Open **Characters** and select **+** to add someone, or use the pencil on a character’s card to open their editor. Enter an appearance prompt under **Appearance details** and select **Generate new version** to preview the change. Enter a **Signature ability** idea to generate a move and effect artwork. Select **Keep this version’s appearance** to generate just the move. Preview a generation, choose the version to use, and restore older artwork and abilities through **Show character history**. See [character studio setup and storage](docs/character-studio.md).
 
 The engine is custom **React + TypeScript + SVG**, with a frame-based movement loop, collision checks, A\* pathfinding, and a character-follow camera. It does not use Phaser, Unity, or a third-party game engine.

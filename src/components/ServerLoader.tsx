@@ -9,11 +9,12 @@ import { CharacterStudio } from "./CharacterStudio";
 import { Town } from "./Town";
 import { followCamera, DEFAULT_ZOOM } from "../game/camera";
 import { START } from "../game/model";
+import { parseServerTown, type ServerTown } from "../game/server-town";
 
 export function ServerLoader({
   children,
 }: {
-  children: (server?: ServerGame) => React.ReactNode;
+  children: (server?: ServerGame, town?: ServerTown) => React.ReactNode;
 }) {
   const path = window.location.pathname;
   const isDemo =
@@ -22,7 +23,12 @@ export function ServerLoader({
     path === "/" ||
     path === "/index.html";
   const guildId = serverIdFromPath(path);
-  const [server, setServer] = useState<ServerGame>();
+  const [loaded, setLoaded] = useState<{
+    server: ServerGame;
+    town?: ServerTown;
+  }>();
+  const server = loaded?.server;
+  const town = loaded?.town;
   const [error, setError] = useState("");
   const [attempt, setAttempt] = useState(0);
   const [studioOpen, setStudioOpen] = useState(false);
@@ -30,6 +36,7 @@ export function ServerLoader({
     if (isDemo || !guildId) return;
     const controller = new AbortController();
     let loadedFromStudio = false;
+    let cachedTown: { source: string; town: ServerTown } | undefined;
     const fetchGame = async () => {
       try {
         let response = await fetch(`/api/studio/games/${guildId}`, {
@@ -51,11 +58,35 @@ export function ServerLoader({
               : "The game couldn’t load. Check your connection and try again.",
           );
         const next = parseServerGame(await response.json(), guildId);
+        let nextTown: ServerTown | undefined;
+        if (next.town) {
+          const layout = await fetch(next.town.path, {
+            cache: "no-store",
+            signal: controller.signal,
+          });
+          if (!layout.ok)
+            throw new Error(
+              "This server’s town is still publishing. Check again shortly.",
+            );
+          const source = await layout.text();
+          if (source.length > 64_000)
+            throw new Error("This server’s town file is too large.");
+          if (source !== cachedTown?.source) {
+            cachedTown = {
+              source,
+              town: parseServerTown(JSON.parse(source), guildId),
+            };
+          }
+          nextTown = cachedTown.town;
+        }
+        if (controller.signal.aborted) return;
         if (fromStudio) loadedFromStudio = true;
-        setServer((old) =>
-          old && Date.parse(old.updatedAt) >= Date.parse(next.updatedAt)
+        setLoaded((old) =>
+          old && Date.parse(old.server.updatedAt) > Date.parse(next.updatedAt)
             ? old
-            : next,
+            : old?.town === nextTown && old?.server.updatedAt === next.updatedAt
+              ? old
+              : { server: next, town: nextTown },
         );
         setError("");
       } catch (e) {
@@ -79,19 +110,21 @@ export function ServerLoader({
     if (server) document.title = `${server.name} — Adventures of Mint`;
   }, [server?.name]);
   if (isDemo) return children();
-  if (server?.characters.length) return children(server);
+  if (server?.characters.length) return children(server, town);
+  const spawn = town?.spawn ?? START;
   const camera = followCamera(
-    START,
+    spawn,
     window.innerWidth / window.innerHeight,
     DEFAULT_ZOOM,
     window.innerHeight,
+    town,
   );
   return (
     <main className="play-screen server-lobby" aria-label="Server game">
       <div className="world-viewport" aria-hidden="true">
         <Town
           camera={camera}
-          player={START}
+          player={spawn}
           moving={false}
           facing={1}
           crew={[]}
@@ -99,7 +132,8 @@ export function ServerLoader({
           target={null}
           onMove={() => {}}
           onSelect={() => {}}
-          townName={server?.name}
+          townName={town?.name ?? server?.name}
+          serverTown={town}
         />
       </div>
       <section className="server-welcome" aria-live="polite">
@@ -151,7 +185,7 @@ export function ServerLoader({
           gameId={guildId}
           onClose={() => setStudioOpen(false)}
           onPublished={(game) => {
-            setServer(parseServerGame(game, guildId));
+            setLoaded({ server: parseServerGame(game, guildId), town });
             setStudioOpen(false);
           }}
         />

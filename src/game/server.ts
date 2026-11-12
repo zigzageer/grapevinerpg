@@ -6,6 +6,7 @@ import {
   type Character,
   type SaveGame,
 } from "./model";
+import { townPath, type ServerTown } from "./server-town";
 
 export interface ServerGame {
   version: 1;
@@ -13,6 +14,7 @@ export interface ServerGame {
   slug: string;
   name: string;
   updatedAt: string;
+  town?: { path: string };
   characters: Character[];
 }
 
@@ -32,7 +34,8 @@ export function parseServerGame(input: unknown, guildId: string): ServerGame {
     !data.name.trim() ||
     typeof data.slug !== "string" ||
     serverIdFromPath(`/${data.slug}`) !== guildId ||
-    typeof data.updatedAt !== "string" ||
+    !Number.isFinite(Date.parse(data.updatedAt)) ||
+    (data.town !== undefined && data.town?.path !== townPath(guildId)) ||
     !Array.isArray(data.characters) ||
     data.characters.length > 24
   )
@@ -67,12 +70,14 @@ export function parseServerGame(input: unknown, guildId: string): ServerGame {
 
 // Server rosters are authoritative; local saves hold play preferences and position only.
 // In particular, never run the Mint cast migrations for a server game.
-export function loadServerSave(server: ServerGame): SaveGame {
-  let saved: Partial<SaveGame> = {};
+export function loadServerSave(
+  server: ServerGame,
+  town?: ServerTown,
+  saveKey = serverSaveKey(server.guildId),
+): SaveGame {
+  let saved: Partial<SaveGame> & { layoutGuildId?: string } = {};
   try {
-    const raw = JSON.parse(
-      localStorage.getItem(serverSaveKey(server.guildId)) || "null",
-    );
+    const raw = JSON.parse(localStorage.getItem(saveKey) || "null");
     if (raw?.version === 1) saved = raw;
   } catch {
     /* A missing or damaged device save starts at the town center. */
@@ -81,12 +86,13 @@ export function loadServerSave(server: ServerGame): SaveGame {
     ...initialSave(),
     crew: server.characters,
     player:
+      saved.layoutGuildId === town?.guildId &&
       saved.player &&
       Number.isFinite(saved.player.x) &&
       Number.isFinite(saved.player.y) &&
-      canStand(saved.player)
+      canStand(saved.player, town?.walkArea)
         ? saved.player
-        : { ...START },
+        : { ...(town?.spawn ?? START) },
     activeCharacter: server.characters.some(
       (c) => c.id === saved.activeCharacter,
     )

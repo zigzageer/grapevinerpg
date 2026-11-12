@@ -5,6 +5,7 @@ import { StudioStore } from "./studio-store.mjs";
 import { StudioService } from "./studio-service.mjs";
 import { createVercelVerifier } from "./vercel-auth.mjs";
 import { createStudioServer } from "./studio-http.mjs";
+import { MatchService } from "./match-service.mjs";
 
 const env = process.env;
 for (const key of [
@@ -19,15 +20,31 @@ const store = new StudioStore({
   directory: env.MINT_STUDIO_DATA_DIR,
   seed: JSON.parse(readFileSync(env.MINT_STUDIO_SEED_PATH, "utf8")),
 });
+const baseUrl = env.GAME_BASE_URL || "https://adventures-of-mint.vercel.app";
 const service = new StudioService({
   store,
   generate: createImageGenerator({ codexEnv: env }),
   generateAbility: createAbilityGenerator({ codexEnv: env }),
-  baseUrl: env.GAME_BASE_URL || "https://adventures-of-mint.vercel.app",
+  baseUrl,
 });
+const matches = new MatchService({
+  directory: env.MINT_STUDIO_DATA_DIR,
+  loadGame: (id) => service.loadGame(id),
+  baseUrl,
+});
+const matchTimer = setInterval(() => {
+  try {
+    matches.sweep();
+  } catch (error) {
+    console.error("[matches] Could not advance a match.", error.message);
+  }
+}, 1000);
+matchTimer.unref();
 const server = createStudioServer({
   service,
   secret: env.MINT_STUDIO_SECRET,
+  matches,
+  matchBotSecret: env.MINT_MATCH_BOT_SECRET,
   verifyVercel: createVercelVerifier({
     teamSlug: env.MINT_STUDIO_VERCEL_TEAM_SLUG || "tensymain-8759s-projects",
     teamId: env.MINT_STUDIO_VERCEL_TEAM_ID || "team_YMxRg3j0ixQCGCc8wjrgWSZz",
@@ -50,17 +67,17 @@ server.listen(
 );
 for (const signal of ["SIGTERM", "SIGINT"])
   process.once(signal, () => {
+    clearInterval(matchTimer);
     service.close();
+    let httpClosed = false;
     server.close(() => {
-      if (!service.running) {
-        store.close();
-        process.exit(0);
-      }
+      httpClosed = true;
     });
     // A running Codex child is terminated with the service process group by systemd.
     const stop = setInterval(() => {
-      if (!service.running) {
+      if (httpClosed && !service.running) {
         clearInterval(stop);
+        matches.close();
         store.close();
         process.exit(0);
       }

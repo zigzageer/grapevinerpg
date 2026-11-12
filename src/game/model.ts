@@ -1,4 +1,4 @@
-import { WORLD, WALK_BOUNDS, TOWN_OBSTACLES } from "./locations.ts";
+import { WORLD, WALK_BOUNDS, TOWN_OBSTACLES, type Footprint } from "./locations.ts";
 export { WORLD };
 export type Point = { x: number; y: number };
 export type Hair = "short" | "messy" | "long" | "curly" | "bald";
@@ -612,13 +612,22 @@ export function parseCrew(input: unknown): Character[] {
 }
 // Tree trunks and building footprints; movement uses the feet, not the sprite bounds.
 export const OBSTACLES = TOWN_OBSTACLES;
-export function canStand(p: Point): boolean {
+export interface WalkArea {
+  bounds: typeof WALK_BOUNDS;
+  obstacles: readonly Footprint[];
+}
+export const MINT_WALK_AREA: WalkArea = {
+  bounds: WALK_BOUNDS,
+  obstacles: OBSTACLES,
+};
+export function canStand(p: Point, area = MINT_WALK_AREA): boolean {
+  const { left, right, top, bottom } = area.bounds;
   return (
-    p.x >= WALK_BOUNDS.left &&
-    p.x <= WALK_BOUNDS.right &&
-    p.y >= WALK_BOUNDS.top &&
-    p.y <= WALK_BOUNDS.bottom &&
-    !OBSTACLES.some(
+    p.x >= left &&
+    p.x <= right &&
+    p.y >= top &&
+    p.y <= bottom &&
+    !area.obstacles.some(
       (r) =>
         p.x > r.x - 15 &&
         p.x < r.x + r.w + 15 &&
@@ -627,27 +636,35 @@ export function canStand(p: Point): boolean {
     )
   );
 }
-export function movePlayer(p: Point, dx: number, dy: number): Point {
-  const x = canStand({ x: p.x + dx, y: p.y }) ? p.x + dx : p.x;
-  const y = canStand({ x, y: p.y + dy }) ? p.y + dy : p.y;
+export function movePlayer(p: Point, dx: number, dy: number, area = MINT_WALK_AREA): Point {
+  const x = canStand({ x: p.x + dx, y: p.y }, area) ? p.x + dx : p.x;
+  const y = canStand({ x, y: p.y + dy }, area) ? p.y + dy : p.y;
   return { x, y };
 }
 /** Consume movement in short steps so slower frames cannot skip over obstacles. */
-export function movePlayerInSteps(p: Point, dx: number, dy: number): Point {
+export function movePlayerInSteps(p: Point, dx: number, dy: number, area = MINT_WALK_AREA): Point {
   const count = Math.max(
     1,
     Math.ceil(Math.max(Math.abs(dx), Math.abs(dy)) / 8),
   );
   let next = p;
   for (let i = 0; i < count; i++)
-    next = movePlayer(next, dx / count, dy / count);
+    next = movePlayer(next, dx / count, dy / count, area);
   return next;
 }
 
-export function loadSave(): SaveGame {
+export function loadSave(
+  saveKey = SAVE_KEY,
+  area = MINT_WALK_AREA,
+  spawn = START,
+  fallbackKey?: string,
+): SaveGame {
+  const fresh = () => ({ ...initialSave(), player: { ...spawn } });
   try {
-    const raw = JSON.parse(localStorage.getItem(SAVE_KEY) || "null");
-    if (raw?.version !== 1) return initialSave();
+    const saved = localStorage.getItem(saveKey);
+    const fallback = !saved && fallbackKey ? localStorage.getItem(fallbackKey) : null;
+    const raw = JSON.parse(saved || fallback || "null");
+    if (raw?.version !== 1) return fresh();
     const crew = parseCrew(raw.crew);
     const previousCastVersion = raw.castVersion ?? 0;
     while (crew.length < 3) crew.push({ ...DEFAULT_CREW[crew.length] });
@@ -731,12 +748,13 @@ export function loadSave(): SaveGame {
       }
     }
     const player =
+      saved &&
       raw.player &&
       Number.isFinite(raw.player.x) &&
       Number.isFinite(raw.player.y) &&
-      canStand(raw.player)
+      canStand(raw.player, area)
         ? raw.player
-        : { ...START };
+        : { ...spawn };
     return {
       version: 1,
       castVersion: 11,
@@ -757,7 +775,7 @@ export function loadSave(): SaveGame {
       sound: raw.sound === true,
     };
   } catch {
-    return initialSave();
+    return fresh();
   }
 }
 export const spots = [

@@ -383,15 +383,19 @@ test("new characters remain saved drafts until applied and are isolated between 
 test("website towns read published manifests and preserve website versions during bot updates", async (t) => {
   const guildId = "123456789012345678";
   const userId = "223456789012345678";
+  const town = { path: `/games/${guildId}/town.json` };
   let published = manifest(guildId, [
     {
       ...base,
       id: `discord-${userId}`,
+      discordUserId: userId,
       name: "Server Bob",
       preset: undefined,
       sprite: `/games/${guildId}/${userId}.png`,
     },
   ]);
+  published.town = town;
+  published.botJobs = { "create-town": true };
   const requests = [];
   const { service, store } = setup(t, {
     fetch: async (url, options) => {
@@ -405,6 +409,9 @@ test("website towns read published manifests and preserve website versions durin
     },
   });
   const first = await service.loadGame(guildId);
+  assert.deepEqual(first.town, town);
+  assert.deepEqual(first.botJobs, published.botJobs);
+  assert.equal(first.characters[0].discordUserId, userId);
   assert.equal(first.characters[0].name, "Server Bob");
   assert.equal((await service.loadGame(guildId)).updatedAt, first.updatedAt);
   const job = await service.enqueue(
@@ -434,6 +441,8 @@ test("website towns read published manifests and preserve website versions durin
     ],
   };
   const refreshed = await service.loadGame(guildId);
+  assert.deepEqual(refreshed.town, town);
+  assert.deepEqual(refreshed.botJobs, published.botJobs);
   assert.deepEqual(
     refreshed.characters.map((c) => c.name),
     ["Website Bob", "New member"],

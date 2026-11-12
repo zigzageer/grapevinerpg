@@ -16,11 +16,12 @@ export function followCamera(
   aspectRatio: number,
   zoom = DEFAULT_ZOOM,
   viewportHeight?: number,
+  world = WORLD,
 ): CameraView {
   const aspect =
     Number.isFinite(aspectRatio) && aspectRatio > 0
       ? aspectRatio
-      : WORLD.width / WORLD.height;
+      : world.width / world.height;
   const scale = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom));
   // Keep characters readable without filling an entire portrait phone screen.
   const pixels =
@@ -32,13 +33,13 @@ export function followCamera(
     pixels && baseScale
       ? pixels / ((baseScale * scale) / DEFAULT_ZOOM)
       : 900 / scale;
-  const height = Math.min(WORLD.height, desiredHeight, WORLD.width / aspect);
+  const height = Math.min(world.height, desiredHeight, world.width / aspect);
   const width = height * aspect;
   return {
-    x: Math.max(0, Math.min(WORLD.width - width, player.x - width / 2)),
+    x: Math.max(0, Math.min(world.width - width, player.x - width / 2)),
     y: Math.max(
       0,
-      Math.min(WORLD.height - height, player.y - height * 0.52 - 42),
+      Math.min(world.height - height, player.y - height * 0.52 - 42),
     ),
     width,
     height,

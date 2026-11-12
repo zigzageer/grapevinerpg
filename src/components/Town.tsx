@@ -1,6 +1,6 @@
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import type { Character, Point } from "../game/model";
-import { characterKey } from "../game/model";
+import { canStand, characterKey } from "../game/model";
 import type { CameraView } from "../game/camera";
 import { CharacterArt } from "./Character";
 import { sceneryArtUrl } from "../game/art";
@@ -19,6 +19,8 @@ import {
   type ResidentConversation,
 } from "../game/town-life";
 import { TownResident, TownShadow, TownVehicle } from "./TownLife";
+import { ServerTownScenery } from "./ServerTownScenery";
+import type { ServerTown } from "../game/server-town";
 
 function Pine({ x, y, s = 1 }: Point & { s?: number }) {
   return (
@@ -389,6 +391,7 @@ interface Props {
   onTalk?: (conversation: ResidentConversation) => void;
   paused?: boolean;
   townName?: string;
+  serverTown?: ServerTown;
 }
 const CITIZEN_SPOTS: Point[] = [
   { x: 225, y: 552 },
@@ -445,6 +448,7 @@ export function Town({
   onTalk,
   paused = false,
   townName = TOWN_NAME,
+  serverTown,
 }: Props) {
   const [life, setLife] = useState(createTownLife);
   const live = useRef(life);
@@ -472,6 +476,28 @@ export function Town({
     () => (hasLife ? [...streetTraffic(life.time), ...winterParade(life.time)] : []),
     [hasLife, life.time],
   );
+  const citizenSpots = useMemo(() => {
+    if (!serverTown) return CITIZEN_SPOTS;
+    const base = serverTown.characterSpawns;
+    const spots = [...base];
+    for (let index = base.length; index < crew.length; index++) {
+      const point = base[index % base.length];
+      const offset = Math.floor(index / base.length) * 110;
+      const separated = (candidate: Point) =>
+        canStand(candidate, serverTown.walkArea) &&
+        [serverTown.spawn, ...spots].every(
+          (p) => Math.abs(p.x - candidate.x) >= 100 || Math.abs(p.y - candidate.y) >= 30,
+        );
+      const extra = [
+        { x: point.x - offset, y: point.y },
+        { x: point.x + offset, y: point.y },
+        { x: point.x, y: point.y - 60 },
+        { x: point.x, y: point.y + 60 },
+      ].find(separated);
+      spots.push(extra ?? point);
+    }
+    return spots;
+  }, [serverTown, crew.length]);
   const entities = [
     ...crew.map((c, i) => ({
       kind: "crew" as const,
@@ -479,7 +505,7 @@ export function Town({
       key: characterKey(c),
       ...(characterKey(c) === activeKey
         ? player
-        : CITIZEN_SPOTS[i % CITIZEN_SPOTS.length]),
+        : citizenSpots[i % citizenSpots.length]),
     })),
     ...(onTalk
       ? life.residents.map((walker) => ({
@@ -529,7 +555,7 @@ export function Town({
           <stop offset="1" stopColor="#253039" stopOpacity="0" />
         </radialGradient>
       </defs>
-      <Scenery townName={townName} />
+      {serverTown ? <ServerTownScenery town={serverTown} /> : <Scenery townName={townName} />}
       {target && (
         <g
           className="walk-target"

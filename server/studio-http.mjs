@@ -3,7 +3,14 @@ import https from "node:https";
 import { MAX_BODY, verifyBridge, canonicalIp } from "./bridge.mjs";
 import { StudioError } from "./studio-store.mjs";
 
-export function createStudioServer({ service, secret, tls, verifyVercel }) {
+export function createStudioServer({
+  service,
+  secret,
+  tls,
+  verifyVercel,
+  matches,
+  matchBotSecret,
+}) {
   const handle = async (request, response) => {
     response.setHeader("Cache-Control", "no-store");
     response.setHeader("X-Content-Type-Options", "nosniff");
@@ -12,6 +19,9 @@ export function createStudioServer({ service, secret, tls, verifyVercel }) {
       response.end(JSON.stringify(value));
     };
     try {
+      const url = new URL(request.url, "https://studio.local");
+      const internal = url.pathname.startsWith("/internal/");
+      const matchInternal = url.pathname.startsWith("/internal/v1/");
       const chunks = [];
       let size = 0;
       for await (const chunk of request) {
@@ -26,17 +36,19 @@ export function createStudioServer({ service, secret, tls, verifyVercel }) {
       const body = Buffer.concat(chunks);
       let ip;
       try {
-        ip = verifyBridge({
-          secret,
-          method: request.method,
-          path: request.url,
-          headers: request.headers,
-          body,
-        });
+        const requestSecret = matchInternal ? matchBotSecret : secret;
+        if (requestSecret)
+          ip = verifyBridge({
+            secret: requestSecret,
+            method: request.method,
+            path: request.url,
+            headers: request.headers,
+            body,
+          });
       } catch {
         /* Reject malformed authentication headers. */
       }
-      if (!ip && verifyVercel && !request.url.startsWith("/internal/")) {
+      if (!ip && verifyVercel && !internal) {
         const authorization = String(request.headers.authorization || "");
         if (
           authorization.startsWith("Bearer ") &&
@@ -53,7 +65,6 @@ export function createStudioServer({ service, secret, tls, verifyVercel }) {
         send(401, { error: "Studio request could not be authenticated." });
         return;
       }
-      const url = new URL(request.url, "https://studio.local");
       if (url.search) throw new StudioError("Unexpected request parameters.");
       const parts = url.pathname.split("/").filter(Boolean);
       let input = {};
@@ -66,6 +77,43 @@ export function createStudioServer({ service, secret, tls, verifyVercel }) {
         if (!input || typeof input !== "object" || Array.isArray(input))
           throw new StudioError("Invalid studio request.");
       }
+      if (matches && matchInternal) {
+        const [, , resource, id, member] = parts;
+        if (
+          request.method === "GET" &&
+          resource === "links" &&
+          parts.length === 5
+        ) {
+          send(200, matches.getLink(id, member));
+          return;
+        }
+        if (
+          resource === "matches" &&
+          request.method === "GET" &&
+          parts.length === 4
+        ) {
+          send(200, matches.getMatch(id));
+          return;
+        }
+        if (request.method === "POST") {
+          if (resource === "links" && parts.length === 3) {
+            send(200, await matches.link(input));
+            return;
+          }
+          if (resource === "matches" && parts.length === 3) {
+            send(201, await matches.challenge(input));
+            return;
+          }
+          if (
+            resource === "matches" &&
+            member === "actions" &&
+            parts.length === 5
+          ) {
+            send(200, await matches.act(id, input));
+            return;
+          }
+        }
+      }
       if (request.method === "GET") {
         if (url.pathname === "/health") {
           send(200, { ok: true });
@@ -73,6 +121,10 @@ export function createStudioServer({ service, secret, tls, verifyVercel }) {
         }
         if (parts[0] === "games" && parts.length === 2) {
           send(200, await service.loadGame(parts[1]));
+          return;
+        }
+        if (matches && parts[0] === "matches" && parts.length === 2) {
+          send(200, matches.getMatch(parts[1]));
           return;
         }
         if (

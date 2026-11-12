@@ -1,0 +1,269 @@
+{
+  "version": 1,
+  "guildId": "00000000000000001",
+  "name": "Grapevine",
+  "width": 1720,
+  "height": 1200,
+  "spawn": {
+    "x": 850,
+    "y": 590
+  },
+  "palette": {
+    "ground": "#a394a9",
+    "road": "#555165",
+    "accent": "#d0e08a"
+  },
+  "roads": [
+    {
+      "x": 0,
+      "y": 500,
+      "w": 1720,
+      "h": 156
+    },
+    {
+      "x": 756,
+      "y": 0,
+      "w": 194,
+      "h": 1200
+    },
+    {
+      "x": 132,
+      "y": 994,
+      "w": 1460,
+      "h": 108
+    },
+    {
+      "x": 132,
+      "y": 502,
+      "w": 105,
+      "h": 580
+    },
+    {
+      "x": 1487,
+      "y": 502,
+      "w": 105,
+      "h": 580
+    }
+  ],
+  "buildings": [
+    {
+      "id": "looksmaxxing-gym",
+      "label": "Looksmaxxing Gym",
+      "kind": "workshop",
+      "x": 455,
+      "y": 231,
+      "w": 252,
+      "h": 210,
+      "door": {
+        "x": 583,
+        "y": 468
+      }
+    },
+    {
+      "id": "chud-cafe",
+      "label": "Chud Café",
+      "kind": "shop",
+      "x": 145,
+      "y": 237,
+      "w": 245,
+      "h": 206,
+      "door": {
+        "x": 265,
+        "y": 470
+      }
+    },
+    {
+      "id": "iranian-bazaar",
+      "label": "Iranian Bazaar",
+      "kind": "shop",
+      "x": 1005,
+      "y": 224,
+      "w": 255,
+      "h": 220,
+      "door": {
+        "x": 1132,
+        "y": 470
+      }
+    },
+    {
+      "id": "israeli-market",
+      "label": "Israeli Market",
+      "kind": "shop",
+      "x": 1320,
+      "y": 235,
+      "w": 252,
+      "h": 209,
+      "door": {
+        "x": 1447,
+        "y": 470
+      }
+    },
+    {
+      "id": "incel-arcade",
+      "label": "Incel Arcade",
+      "kind": "venue",
+      "x": 337,
+      "y": 744,
+      "w": 330,
+      "h": 176,
+      "door": {
+        "x": 504,
+        "y": 948
+      }
+    },
+    {
+      "id": "netanyahu-press-room",
+      "label": "Netanyahu Press Room",
+      "kind": "hall",
+      "x": 1023,
+      "y": 739,
+      "w": 361,
+      "h": 181,
+      "door": {
+        "x": 1201,
+        "y": 948
+      }
+    },
+    {
+      "id": "clan-hall",
+      "label": "Grapevine Clan Hall",
+      "kind": "hall",
+      "x": 658,
+      "y": 54,
+      "w": 401,
+      "h": 125,
+      "door": {
+        "x": 853,
+        "y": 207
+      }
+    }
+  ],
+  "landmarks": [
+    {
+      "id": "general-square",
+      "label": "General Square",
+      "kind": "plaza",
+      "x": 851,
+      "y": 440
+    },
+    {
+      "id": "starboard-stage",
+      "label": "Starboard Stage",
+      "kind": "stage",
+      "x": 852,
+      "y": 812
+    },
+    {
+      "id": "selfie-garden",
+      "label": "Selfie Garden",
+      "kind": "garden",
+      "x": 106,
+      "y": 752
+    },
+    {
+      "id": "confessions-corner",
+      "label": "Confessions Corner",
+      "kind": "garden",
+      "x": 1610,
+      "y": 759
+    }
+  ],
+  "characterSpawns": [
+    {
+      "x": 697,
+      "y": 572
+    },
+    {
+      "x": 997,
+      "y": 578
+    },
+    {
+      "x": 850,
+      "y": 705
+    },
+    {
+      "x": 850,
+      "y": 504
+    },
+    {
+      "x": 266,
+      "y": 485
+    },
+    {
+      "x": 582,
+      "y": 485
+    },
+    {
+      "x": 1132,
+      "y": 485
+    },
+    {
+      "x": 1447,
+      "y": 485
+    },
+    {
+      "x": 490,
+      "y": 627
+    },
+    {
+      "x": 1240,
+      "y": 620
+    },
+    {
+      "x": 506,
+      "y": 975
+    },
+    {
+      "x": 1200,
+      "y": 974
+    },
+    {
+      "x": 185,
+      "y": 852
+    },
+    {
+      "x": 1545,
+      "y": 859
+    },
+    {
+      "x": 816,
+      "y": 295
+    },
+    {
+      "x": 908,
+      "y": 321
+    },
+    {
+      "x": 331,
+      "y": 559
+    },
+    {
+      "x": 1399,
+      "y": 568
+    },
+    {
+      "x": 815,
+      "y": 1060
+    },
+    {
+      "x": 919,
+      "y": 1090
+    },
+    {
+      "x": 266,
+      "y": 1050
+    },
+    {
+      "x": 1440,
+      "y": 1040
+    },
+    {
+      "x": 733,
+      "y": 741
+    },
+    {
+      "x": 962,
+      "y": 756
+    }
+  ]
+}
