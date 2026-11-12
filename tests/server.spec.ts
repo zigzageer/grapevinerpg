@@ -221,7 +221,21 @@ test("Grapevine is playable with the existing cast and its own destinations", as
   await picker
     .getByRole("button", { name: "Play as Mint", exact: true })
     .click();
-  await expect(page.getByTestId("server-town-scenery")).toBeVisible();
+  const scenery = page.getByTestId("server-town-scenery");
+  await expect(scenery).toBeVisible();
+  const buildingArt = scenery.locator("[data-building] > image");
+  await expect(buildingArt).toHaveCount(7);
+  const loadedArt = await buildingArt.evaluateAll((elements) =>
+    Promise.all(
+      elements.map(async (element) => {
+        const image = new Image();
+        image.src = element.getAttribute("href")!;
+        await image.decode();
+        return image.naturalWidth;
+      }),
+    ),
+  );
+  expect(loadedArt.every((width) => width >= 640)).toBe(true);
   await expect(page.getByTestId("player-sprite")).toHaveAttribute(
     "data-x",
     "850",

@@ -1,4 +1,4 @@
-import { memo } from "react";
+import { memo, useState } from "react";
 import type {
   ServerBuilding,
   ServerLandmark,
@@ -38,6 +38,61 @@ function Building({
   grapevine: boolean;
 }) {
   const { x, y, w, h, kind, door, label, art } = building;
+  const [failedArt, setFailedArt] = useState<string>();
+  const bottom = y + h;
+  const walkway = (
+    <path
+      d={`M${door.x} ${bottom - 2}V${door.y + 10}`}
+      stroke="#e5c99e"
+      strokeWidth={28}
+      strokeLinecap="round"
+    />
+  );
+  if (art && art !== failedArt) {
+    const plaqueWidth = Math.min(w, Math.max(54, label.length * 7.5 + 20));
+    return (
+      <g data-building={building.id}>
+        {walkway}
+        <ellipse
+          cx={x + w / 2}
+          cy={bottom}
+          rx={w * 0.45}
+          ry={7}
+          fill="#252135"
+          opacity=".25"
+        />
+        <image
+          href={art}
+          x={x}
+          y={y}
+          width={w}
+          height={h}
+          preserveAspectRatio="xMidYMax meet"
+          onError={() => setFailedArt(art)}
+        />
+        <rect
+          x={x + (w - plaqueWidth) / 2}
+          y={bottom + 6}
+          width={plaqueWidth}
+          height={18}
+          rx={6}
+          fill="#342d3e"
+          stroke={accent}
+          strokeWidth=".7"
+        />
+        <text
+          x={x + w / 2}
+          y={bottom + 19}
+          textAnchor="middle"
+          fontSize={Math.min(13, (plaqueWidth - 12) / (label.length * 0.56))}
+          fontWeight="700"
+          fill="#fff1d7"
+        >
+          {label}
+        </text>
+      </g>
+    );
+  }
   const colors = (grapevine && grapevineFacades[building.id]) || facades[kind];
   const doorX = Math.max(23, Math.min(217, ((door.x - x) / w) * 240));
   const fontSize = Math.min(17, 320 / label.length);
@@ -52,12 +107,7 @@ function Building({
         fill="#211d2b"
         opacity=".25"
       />
-      <path
-        d={`M${door.x} ${y + h - 2}V${door.y + 10}`}
-        stroke="#e5c99e"
-        strokeWidth={28}
-        strokeLinecap="round"
-      />
+      {walkway}
       <svg
         x={x}
         y={y}
@@ -131,14 +181,6 @@ function Building({
           strokeWidth="4"
         />
         <circle cx={doorX + 9} cy="139" r="2.7" fill={accent} />
-        {art && (
-          <image
-            href={art}
-            width="240"
-            height="160"
-            preserveAspectRatio="xMidYMax slice"
-          />
-        )}
         <rect
           x="12"
           y="45"
