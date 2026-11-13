@@ -6,6 +6,11 @@ export const ADDITIONAL_BIOS: Partial<
     { title: string; description: string }
   >
 > = {
+  "flag-girl": {
+    title: "Sarina carries the Lion and Sun.",
+    description:
+      "Sarina wears a dark green officer cap and shirt, a black skirt, and gold bracelets. She carries the green, white, and red Lion and Sun flag.",
+  },
   babashark: {
     title: "Here comes the officer.",
     description:
@@ -72,7 +77,7 @@ export const ADDITIONAL_BIOS: Partial<
   loralei: {
     title: "Meet Loralei.",
     description:
-      "Loralei is an adult sex worker with brown hair, bold makeup, a black vintage cap, glossy black fashion clothing, patterned tights, and high heels.",
+      "Loralei has long brown hair, dark sunglasses, an olive beret, and a glossy black outfit.",
   },
   samira: {
     title: "Making an entrance.",
@@ -90,9 +95,9 @@ export const ADDITIONAL_BIOS: Partial<
       "Kain is a green Pepe-style frog with gold glasses and a pinstripe three-piece suit, complete with waistcoat and gold tie.",
   },
   footjobofsteel: {
-    title: "Built like a bear.",
+    title: "On call with a power drill.",
     description:
-      "Footjobofsteel is a golden yellow bear with enormous muscles, a red athletic top, and brown shorts.",
+      "Footjobofsteel wears blue nurse scrubs and white sneakers. He carries a yellow cordless drill.",
   },
   rocky: {
     title: "Meet Rocky.",
@@ -100,18 +105,18 @@ export const ADDITIONAL_BIOS: Partial<
       "Rocky is Israeli. He wears a black Hasidic hat and coat, side curls, and an olive IDF vest.",
   },
   miel: {
-    title: "Bunny ears. A glass of rosé.",
+    title: "Bunny ears and lace-up boots.",
     description:
-      "Miel has light skin, long brown hair, full lip-filler lips, and a bunny-ear headband. She carries a glass of pink rosé wine.",
+      "Miel wears a bunny-ear headband, a black turtleneck dress, lace-up boots, gold hoops, and a Star of David necklace. Her long auburn hair fades to pink.",
   },
   zippy: {
-    title: "Short, strong, and full of energy.",
+    title: "Always time for takeout.",
     description:
-      "Zippy is gay, short, stocky, and muscular, with a bright floral shirt and a rainbow wristband. His arm patches read “HIV +” and “I HAVE AIDS.”",
+      "Zippy wears an oversized olive cap, dark sunglasses, and an open olive uniform. He eats noodles from a takeout carton as he goes.",
   },
   jat: {
-    title: "A strong jaw and a favorite mug.",
+    title: "His glasses never stay put.",
     description:
-      "Jat is Sri Lankan, with dark brown skin and a strong square jaw. He wears the Sri Lankan flag on his shirt and carries an Asuka coffee mug.",
+      "Jat has black curls and thick black glasses. He wears a green shirt with the Bangladesh flag and green plaid trousers, and carries a wooden placard.",
   },
 };
