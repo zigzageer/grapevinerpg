@@ -1,8 +1,10 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type BrowserContext } from "@playwright/test";
+import { createHash } from "node:crypto";
 import { DEFAULT_CREW } from "../src/game/model";
 import sampleGame from "../examples/server-town/game.json" with { type: "json" };
 import sampleTown from "../examples/server-town/town.json" with { type: "json" };
 import type { MatchSnapshot } from "../src/game/matches";
+import type { RemotePlayer } from "../src/game/presence";
 const GUILD = "123456789012345678",
   OTHER = "223456789012345678",
   USER = "323456789012345678";
@@ -146,7 +148,7 @@ test("server saves are isolated from Mint and other servers; later roster update
     "data-tv-look",
     "true",
   );
-  await page.goto("/");
+  await page.goto("/mint");
   await page.getByRole("button", { name: "Play as Mint", exact: true }).click();
   await expect(page.getByTestId("active-character-name")).toHaveText("Mint");
   await page.goto(`/${game.slug}`);
@@ -253,6 +255,147 @@ test("Grapevine is playable with the existing cast and its own destinations", as
   await expect(
     page.getByRole("button", { name: "Walk to Iranian Bazaar", exact: true }),
   ).toBeVisible();
+});
+
+test("Grapevine's home and direct link share live players across browsers", async ({
+  browser,
+}) => {
+  const first = await browser.newContext();
+  const second = await browser.newContext();
+  const rooms = new Map<string, Map<string, RemotePlayer & { seq: number }>>();
+  const gone = new Set<string>();
+  let online = true;
+  const requests: string[] = [];
+  const mockPresence = async (context: BrowserContext) => {
+    await context.route("**/api/studio/presence", async (route) => {
+      const { worldId, sessionToken, seq, characterId, x, y, facing, moving } =
+        route.request().postDataJSON();
+      requests.push(worldId);
+      if (!online) return route.fulfill({ status: 503, json: {} });
+      const room = rooms.get(worldId) ?? new Map();
+      rooms.set(worldId, room);
+      const sessionId = createHash("sha256")
+        .update(sessionToken)
+        .digest("hex")
+        .slice(0, 32);
+      const previous = room.get(sessionId);
+      if (!gone.has(sessionId) && (!previous || previous.seq < seq)) {
+        room.set(sessionId, {
+          sessionId,
+          seq,
+          characterId,
+          x,
+          y,
+          facing,
+          moving,
+        });
+      }
+      return route.fulfill({
+        json: {
+          players: [...room.values()]
+            .filter((p) => p.sessionId !== sessionId)
+            .map(({ seq, ...player }) => player),
+        },
+      });
+    });
+  };
+  try {
+    await Promise.all([mockPresence(first), mockPresence(second)]);
+    const home = await first.newPage();
+    const direct = await second.newPage();
+    await Promise.all([home.goto("/"), direct.goto("/grapevine")]);
+    for (const page of [home, direct]) {
+      await expect(page.getByTestId("server-town-scenery")).toBeVisible();
+      await expect(
+        page.getByRole("dialog", { name: "Choose a clan member" }),
+      ).toBeVisible();
+    }
+    expect(requests).toEqual([]);
+
+    await home
+      .getByRole("button", { name: "Play as Mint", exact: true })
+      .click();
+    await direct
+      .getByRole("button", { name: "Play as Zippy", exact: true })
+      .click();
+    const peer = home.getByTestId("remote-player-sprite");
+    const local = direct.getByTestId("player-sprite");
+    await expect(peer).toHaveCount(1);
+    await expect(peer).toHaveAttribute("data-character", "friend-9");
+    await expect(peer).toHaveAttribute("data-x", "850");
+    await expect(peer.locator("image").first()).toHaveAttribute(
+      "href",
+      "/characters/zippy.png",
+    );
+    const screenX = () =>
+      peer.evaluate((node) => (node as SVGGElement).getScreenCTM()!.e);
+    const initialScreenX = await screenX();
+    const peerSession = (await peer.getAttribute("data-session"))!;
+    await expect(direct.getByTestId("remote-player-sprite")).toHaveAttribute(
+      "data-character",
+      "you",
+    );
+    const zippyCitizen = home.getByRole("button", {
+      name: "Interact with Zippy",
+      exact: true,
+    });
+    await expect(zippyCitizen).toHaveCount(0);
+
+    await direct.keyboard.down("a");
+    try {
+      await expect
+        .poll(async () => Number(await peer.getAttribute("data-x")))
+        .toBeLessThan(805);
+      await expect(peer.locator(".walking")).toHaveCount(1);
+    } finally {
+      await direct.keyboard.up("a");
+    }
+    await direct.getByRole("button", { name: "Pause menu", exact: true }).click();
+    await expect(
+      direct.getByRole("link", { name: "Visit Adventures of Mint" }),
+    ).toHaveAttribute("href", "/mint");
+    const stopped = (await local.getAttribute("data-x"))!;
+    await expect(peer).toHaveAttribute("data-x", stopped);
+    await expect(peer.locator(".walking")).toHaveCount(0);
+    await expect.poll(screenX).toBeLessThan(initialScreenX - 30);
+    await direct
+      .getByRole("button", { name: "Choose character", exact: true })
+      .click();
+    await direct
+      .getByRole("button", { name: "Play as Mint", exact: true })
+      .click();
+    await expect(peer).toHaveAttribute("data-session", peerSession);
+    await expect(peer).toHaveAttribute("data-character", "you");
+    const homeSprite = home.getByTestId("player-sprite");
+    await expect(homeSprite).toHaveAttribute("data-character", "you");
+    await expect(zippyCitizen).toHaveCount(1);
+
+    online = false;
+    await expect(peer).toHaveCount(0, { timeout: 8_000 });
+    await expect(homeSprite).toHaveAttribute("data-x", "850");
+    online = true;
+    await home.evaluate(() => window.dispatchEvent(new Event("online")));
+    await expect(peer).toHaveAttribute("data-session", peerSession, {
+      timeout: 8_000,
+    });
+
+    gone.add(peerSession);
+    rooms.get("grapevine")!.delete(peerSession);
+    await direct.goto("/mint");
+    await direct
+      .getByRole("button", { name: "Play as Mint", exact: true })
+      .click();
+    await expect(direct.getByTestId("server-town-scenery")).toHaveCount(0);
+    await expect.poll(() => rooms.get("mint")?.size).toBe(1);
+    await expect(peer).toHaveCount(0);
+    await expect(direct.getByTestId("remote-player-sprite")).toHaveCount(0);
+
+    await home.goto("/grapevine");
+    await expect(homeSprite).toHaveAttribute("data-character", "you");
+    expect(new Set(requests)).toEqual(new Set(["grapevine", "mint"]));
+  } finally {
+    await Promise.all([first.close(), second.close()]);
+  }
 });
 
 test("the battle page reads the signup and steps through the finished replay", async ({

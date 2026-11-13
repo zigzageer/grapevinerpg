@@ -13,6 +13,7 @@ import {
   DAVID,
   DEFAULT_CREW,
   parseCrew,
+  ZIPPY,
 } from "./model";
 
 function hit(state: BattleState, move: MoveId) {
@@ -135,7 +136,7 @@ describe("signature abilities", () => {
     ).map((character) => createBattle(character, "Opponent").player.signatures);
     expect(signatures).toHaveLength(26);
     expect(signatures.every((moves) => moves.length > 0)).toBe(true);
-    expect(new Set(signatures.flat().map((move) => move.name)).size).toBe(29);
+    expect(new Set(signatures.flat().map((move) => move.name)).size).toBe(32);
     const renamed = { ...DAVID, name: "Dave", preset: undefined };
     const migrated = { ...DAVID, id: "friend-20" };
     expect(createBattle(renamed, blindian).player.signatures[0].name).toBe(
@@ -275,5 +276,61 @@ describe("signature abilities", () => {
       damage: -30,
     });
     expect(healed.opponent).toEqual(duel.opponent);
+  });
+
+  it("keeps Zippy's three attacks on a published character with a generated move", () => {
+    const art = "/api/studio/assets/a1a1a1a1-0000-0000-0000-000000000000.png";
+    const zippy = {
+      ...ZIPPY,
+      preset: undefined,
+      sprite: art,
+      ability: {
+        name: "Jelly Bean Storm",
+        description: "Throw a handful of jelly beans.",
+        style: "projectile" as const,
+        art,
+      },
+    };
+    const duel = createBattle(zippy, DAVID);
+    expect(duel.player.signatures.map((move) => move.id)).toEqual([
+      "diarrhea-spray",
+      "needle-toss",
+      "fleshlight-volley",
+      "signature",
+    ]);
+    const attacks = [
+      ["diarrhea-spray", 1],
+      ["needle-toss", 3],
+      ["fleshlight-volley", 2],
+    ] as const;
+    for (const [id, hits] of attacks) {
+      const resolved = hit(duel, id);
+      expect(resolved.event).toMatchObject({ move: id, visual: id, hits });
+      expect(resolved.event?.art).toBe(`/abilities/zippy-${id}.webp`);
+      expect(resolved.opponent.hp).toBeLessThan(duel.opponent.hp);
+      expect(resolved.player.pp).toBe(3);
+    }
+    expect(hit(duel, "signature").event?.art).toBe(art);
+  });
+
+  it("lets Footjobofsteel hit twice with the drill or heal with First Aid", () => {
+    const nurse = DEFAULT_CREW.find((c) => c.preset === "footjobofsteel")!;
+    const duel = createBattle(nurse, DAVID);
+    expect(duel.player.signatures.map(({ id }) => id)).toEqual([
+      "drill-rush",
+      "first-aid",
+    ]);
+    expect(hit(duel, "drill-rush").event).toMatchObject({
+      visual: "drill-rush",
+      hits: 2,
+    });
+    const injured = { ...duel, player: { ...duel.player, hp: 60 } };
+    const treated = battleReducer(
+      battleReducer(injured, { type: "choose", move: "first-aid" }),
+      { type: "timing", grade: "good" },
+    );
+    expect(treated.player).toMatchObject({ hp: 84, pp: 3 });
+    expect(treated.opponent).toEqual(duel.opponent);
+    expect(treated.event).toMatchObject({ visual: "first-aid", damage: -24 });
   });
 });

@@ -9,7 +9,7 @@ for (const size of [
     const errors: string[] = [];
     page.on("pageerror", (e) => errors.push(e.message));
     await page.setViewportSize(size);
-    await page.goto("/");
+    await page.goto("/mint");
     await expect
       .poll(
         async () =>

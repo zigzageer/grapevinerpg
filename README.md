@@ -1,6 +1,6 @@
 # Adventures of Mint
 
-**Play:** https://adventures-of-mint.vercel.app
+**Play:** https://thesharty.online
 
 A full-screen 2D browser game starring Mint and the whole cast. Choose a character on your first visit, then start walking. The game remembers your choice on this device. The world fills the display; character selection, controls, and editing live in in-game overlays. This free-roam demo has no story or quests yet.
 
@@ -8,13 +8,15 @@ Click a cast member in town to **Fight**, **Kiss**, or **Play as** them. Duels t
 
 Each Discord server can have its own empty town and cast. The `/game create` and `/game add` bot modules use the VPS Codex CLI and its saved ChatGPT login to generate characters from server nicknames, avatars, descriptions, and uploaded references. The bot publishes its roster and artwork through GitHub and Vercel. See [bot integration and setup](docs/discord-games.md).
 
-Visit **Grapevine Clan** from the pause menu or open `/grapevine` to play the existing cast in its own town. Open `/town-preview` to explore the Signal Yard sample. Discord towns can publish their own [town layouts](docs/server-town-format.md), and the [match service](docs/server-wars-api.md) provides server-war signups, Discord duels, and browser replays.
+The homepage and `/grapevine` open the Grapevine Clan map. Visit `/mint` to play the original snowy town, or open `/town-preview` to explore the Signal Yard sample. Discord towns can publish their own [town layouts](docs/server-town-format.md), and the [match service](docs/server-wars-api.md) provides server-war signups, Discord duels, and browser replays.
+
+To play together, open the same town link on separate devices and choose a published character. Everyone in that town can see the other players walk and run. Mint, Grapevine, and each Discord town have separate groups of players. The downloadable demo runs offline.
 
 Open **Characters** and select **+** to add someone, or use the pencil on a character’s card to open their editor. Enter an appearance prompt under **Appearance details** and select **Generate new version** to preview the change. Enter a **Signature ability** idea to generate a move and effect artwork. Select **Keep this version’s appearance** to generate just the move. Preview a generation, choose the version to use, and restore older artwork and abilities through **Show character history**. See [character studio setup and storage](docs/character-studio.md).
 
 The engine is custom **React + TypeScript + SVG**, with a frame-based movement loop, collision checks, A\* pathfinding, and a character-follow camera. It does not use Phaser, Unity, or a third-party game engine.
 
-The snowy town now uses AI-generated facades based on official South Park visual references: **Tweek Bros. Coffee, City Wok, Tom’s Rhinoplasty, South Park Elementary, Park County Police Station, and the Cartman, Marsh, Broflovski, and McCormick houses**, plus the bus stop. Downtown, the school/civic block, and the neighborhood connect through walkable streets. This is a playable arrangement of recognizable locations, not an exact canonical street map. See [reference and artwork notes](docs/town-reference.md).
+The original snowy town at `/mint` uses illustrated facades for **Tweek Bros. Coffee, City Wok, Tom’s Rhinoplasty, South Park Elementary, Park County Police Station, and the Cartman, Marsh, Broflovski, and McCormick houses**, plus the bus stop. Downtown, the school and civic block, and the neighborhood connect through walkable streets. See [reference and artwork notes](docs/town-reference.md).
 
 Open the **map button** or press **M**, then choose a destination to walk there. Movement controls immediately cancel the automatic route. Building names and house labels are defined in `src/game/locations.ts`; they are rendered separately from the images so they can be renamed later.
 

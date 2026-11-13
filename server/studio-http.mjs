@@ -1,6 +1,11 @@
 import http from "node:http";
 import https from "node:https";
-import { MAX_BODY, verifyBridge, canonicalIp } from "./bridge.mjs";
+import {
+  MAX_BODY,
+  PRESENCE_BODY_LIMIT,
+  verifyBridge,
+  canonicalIp,
+} from "./bridge.mjs";
 import { StudioError } from "./studio-store.mjs";
 
 export function createStudioServer({
@@ -11,6 +16,7 @@ export function createStudioServer({
   matches,
   matchBotSecret,
   fightGifs,
+  presence,
 }) {
   const handle = async (request, response) => {
     response.setHeader("Cache-Control", "no-store");
@@ -23,15 +29,33 @@ export function createStudioServer({
       const url = new URL(request.url, "https://studio.local");
       const internal = url.pathname.startsWith("/internal/");
       const matchInternal = url.pathname.startsWith("/internal/v1/");
+      const presenceUpdate =
+        url.pathname === "/presence" && request.method === "POST";
+      const bodyLimit = presenceUpdate ? PRESENCE_BODY_LIMIT : MAX_BODY;
       const chunks = [];
       let size = 0;
-      for await (const chunk of request) {
+      if (
+        Number(request.headers["content-length"]) > bodyLimit &&
+        presenceUpdate
+      ) {
+        send(413, { error: "Player update is too large." });
+        return;
+      }
+      const stream = presenceUpdate
+        ? request.iterator({ destroyOnReturn: false })
+        : request;
+      for await (const chunk of stream) {
         size += chunk.length;
-        if (size > MAX_BODY)
+        if (size > bodyLimit) {
+          if (presenceUpdate) {
+            send(413, { error: "Player update is too large." });
+            return;
+          }
           throw new StudioError(
             "Upload a reference image smaller than 2 MB.",
             413,
           );
+        }
         chunks.push(chunk);
       }
       const body = Buffer.concat(chunks);
@@ -77,6 +101,10 @@ export function createStudioServer({
         }
         if (!input || typeof input !== "object" || Array.isArray(input))
           throw new StudioError("Invalid studio request.");
+      }
+      if (presence && presenceUpdate) {
+        send(200, presence.update(input));
+        return;
       }
       if (matches && matchInternal) {
         const [, , resource, id, member] = parts;

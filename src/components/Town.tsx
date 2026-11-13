@@ -2,6 +2,7 @@ import { memo, useEffect, useMemo, useRef, useState } from "react";
 import type { Character, Point } from "../game/model";
 import { canStand, characterKey } from "../game/model";
 import type { CameraView } from "../game/camera";
+import type { RemotePlayer } from "../game/presence";
 import { CharacterArt } from "./Character";
 import { sceneryArtUrl } from "../game/art";
 import {
@@ -392,7 +393,9 @@ interface Props {
   paused?: boolean;
   townName?: string;
   serverTown?: ServerTown;
+  remotePlayers?: Array<RemotePlayer & { character: Character }>;
 }
+const NO_REMOTE_PLAYERS: NonNullable<Props["remotePlayers"]> = [];
 const CITIZEN_SPOTS: Point[] = [
   { x: 225, y: 552 },
   { x: 450, y: 552 },
@@ -449,6 +452,7 @@ export function Town({
   paused = false,
   townName = TOWN_NAME,
   serverTown,
+  remotePlayers = NO_REMOTE_PLAYERS,
 }: Props) {
   const [life, setLife] = useState(createTownLife);
   const live = useRef(life);
@@ -498,14 +502,44 @@ export function Town({
     }
     return spots;
   }, [serverTown, crew.length]);
+  const occupied = useMemo(
+    () => new Map(remotePlayers.map((p) => [p.characterId, p.character])),
+    [remotePlayers],
+  );
   const entities = [
-    ...crew.map((c, i) => ({
+    ...crew.flatMap((c, i) => {
+      const id = characterKey(c);
+      const active = id === activeKey;
+      const other = occupied.get(id);
+      if (
+        !active &&
+        other &&
+        c.kind === other.kind &&
+        c.preset === other.preset &&
+        c.sprite === other.sprite
+      )
+        return [];
+      return [
+        {
+          kind: "crew" as const,
+          c,
+          id,
+          active,
+          remote: undefined,
+          key: `crew-${id}`,
+          ...(active ? player : citizenSpots[i % citizenSpots.length]),
+        },
+      ];
+    }),
+    ...remotePlayers.map((p) => ({
       kind: "crew" as const,
-      c,
-      key: characterKey(c),
-      ...(characterKey(c) === activeKey
-        ? player
-        : citizenSpots[i % citizenSpots.length]),
+      c: p.character,
+      id: p.characterId,
+      active: false,
+      remote: p,
+      key: `remote-${p.sessionId}`,
+      x: p.x,
+      y: p.y,
     })),
     ...(onTalk
       ? life.residents.map((walker) => ({
@@ -586,21 +620,38 @@ export function Town({
             />
           );
         }
-        const active = e.key === activeKey;
+        const { active, remote } = e;
+        const interactive = !active && !remote;
+        const className = remote
+          ? "remote-citizen"
+          : active
+            ? "active-citizen"
+            : "world-citizen";
+        const label = remote
+          ? `${e.c.name}, live player`
+          : interactive
+            ? `Interact with ${e.c.name}`
+            : undefined;
         return (
           <g
             key={e.key}
-            role={active ? undefined : "button"}
-            tabIndex={active ? undefined : 0}
-            aria-label={active ? undefined : `Interact with ${e.c.name}`}
-            className={active ? "active-citizen" : "world-citizen"}
+            role={remote ? "img" : interactive ? "button" : undefined}
+            tabIndex={interactive ? 0 : undefined}
+            aria-label={label}
+            className={className}
+            transform={remote ? undefined : `translate(${e.x} ${e.y})`}
+            style={
+              remote
+                ? { transform: `translate(${e.x}px, ${e.y}px)` }
+                : undefined
+            }
             onPointerDown={(event) => event.stopPropagation()}
             onClick={(event) => {
               event.stopPropagation();
-              if (!active) onSelect(e.c);
+              if (interactive) onSelect(e.c);
             }}
             onKeyDown={(event) => {
-              if (!active && (event.key === "Enter" || event.key === " ")) {
+              if (interactive && (event.key === "Enter" || event.key === " ")) {
                 event.preventDefault();
                 onSelect(e.c);
               }
@@ -608,8 +659,7 @@ export function Town({
           >
             {active && (
               <ellipse
-                cx={e.x}
-                cy={e.y + 2}
+                cy="2"
                 rx="27"
                 ry="7"
                 fill="none"
@@ -618,34 +668,36 @@ export function Town({
                 opacity=".58"
               />
             )}
-            <TownShadow x={e.x} y={e.y} rx={23} ry={5.5} />
+            <TownShadow rx={23} ry={5.5} />
             <g
-              transform={`translate(${e.x - 36} ${e.y - 86.4}) scale(.48)`}
-              data-testid={active ? "player-sprite" : undefined}
-              data-character={e.key}
-              data-x={active ? player.x : undefined}
-              data-y={active ? player.y : undefined}
+              transform="translate(-36 -86.4) scale(.48)"
+              data-testid={
+                remote ? "remote-player-sprite" : active ? "player-sprite" : undefined
+              }
+              data-character={e.id}
+              data-session={remote?.sessionId}
+              data-x={active || remote ? e.x : undefined}
+              data-y={active || remote ? e.y : undefined}
             >
               <CharacterArt
                 c={e.c}
-                moving={active && moving}
-                facing={active ? facing : 1}
+                moving={remote?.moving ?? (active && moving)}
+                facing={remote?.facing ?? (active ? facing : 1)}
               />
             </g>
-            <g
-              className="nameplate"
-              transform={`translate(${e.x} ${e.y + 20})`}
-            >
+            <g className="nameplate" transform="translate(0 20)">
               <rect
-                x="-49"
+                x={remote ? -56 : -49}
                 y="-10"
-                width="98"
+                width={remote ? 112 : 98}
                 height="22"
                 rx="10"
-                fill={active ? "#e5f0b2" : "#f9f2dc"}
+                fill={remote ? "#d7ecf2" : active ? "#e5f0b2" : "#f9f2dc"}
                 opacity=".95"
               />
+              {remote && <circle cx="-45" cy="1" r="3" fill="#287f96" />}
               <text
+                x={remote ? 5 : undefined}
                 textAnchor="middle"
                 y="5"
                 fill="#415748"

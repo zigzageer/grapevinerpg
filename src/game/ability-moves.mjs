@@ -111,15 +111,6 @@ const CAST_ABILITIES = {
     armor: 0.65,
     effect: "burn",
   },
-  zippy: {
-    name: "Flower Power",
-    description: "A double burst of petals, each landing a hit.",
-    visual: "burst",
-    cost: 3,
-    damage: 15,
-    hits: 2,
-    armor: 0.65,
-  },
   jat: {
     name: "Coffee Break",
     description: "Hot coffee burns for two turns when timed.",
@@ -167,15 +158,6 @@ const CAST_ABILITIES = {
     hits: 1,
     armor: 0.25,
     effect: "stun",
-  },
-  footjobofsteel: {
-    name: "Bear Slam",
-    description: "A single big slam that hits through most armor.",
-    visual: "rush",
-    cost: 4,
-    damage: 34,
-    hits: 1,
-    armor: 0.25,
   },
   steakbutterfan: {
     name: "Burger Press",
@@ -329,6 +311,72 @@ const BABASHARK_MOVES = [
   },
 ];
 
+const ZIPPY_MOVES = [
+  {
+    id: "diarrhea-spray",
+    name: "Diarrhea Spray",
+    description: "Blast the opponent with a splash that cuts through armor.",
+    visual: "diarrhea-spray",
+    art: "/abilities/zippy-diarrhea-spray.webp",
+    cost: 3,
+    damage: 29,
+    hits: 1,
+    armor: 0.25,
+  },
+  {
+    id: "needle-toss",
+    name: "Needle Toss",
+    description: "Throw three syringes. Armor reduces each hit.",
+    visual: "needle-toss",
+    art: "/abilities/zippy-needle-toss.webp",
+    cost: 3,
+    damage: 12,
+    hits: 3,
+    armor: 0.85,
+  },
+  {
+    id: "fleshlight-volley",
+    name: "Fleshlight Toss",
+    description: "Two tumbling Fleshlights bounce off the opponent.",
+    visual: "fleshlight-volley",
+    art: "/abilities/zippy-fleshlight-volley.webp",
+    cost: 3,
+    damage: 16,
+    hits: 2,
+    armor: 0.6,
+  },
+];
+
+const NURSE_MOVES = [
+  {
+    id: "drill-rush",
+    name: "Drill Rush",
+    description: "Rev the drill and dash in for two hits through armor.",
+    visual: "drill-rush",
+    cost: 4,
+    damage: 16,
+    hits: 2,
+    armor: 0.35,
+  },
+  {
+    id: "first-aid",
+    name: "First Aid",
+    description: "Patch yourself up. Good timing restores up to 24 HP.",
+    visual: "first-aid",
+    restore: 24,
+    cost: 3,
+    damage: 0,
+    hits: 1,
+    armor: 0,
+  },
+];
+
+const MULTI_SIGNATURES = {
+  babashark: BABASHARK_MOVES,
+  zippy: ZIPPY_MOVES,
+  footjobofsteel: NURSE_MOVES,
+};
+
 const GENERATED_RULES = {
   burst: { cost: 4, damage: 31, hits: 1, armor: 0.25 },
   projectile: { cost: 3, damage: 26, hits: 1, armor: 0.5 },
@@ -353,12 +401,14 @@ const ORIGINAL_CAST = [
   "footjobofsteel",
 ];
 const presetsById = new Map(
-  [...Object.keys(CAST_ABILITIES), "babashark"].map((preset) => {
-    const originalIndex = ORIGINAL_CAST.indexOf(preset);
-    const id =
-      originalIndex < 0 ? "cast-" + preset : "friend-" + (originalIndex + 3);
-    return [id, preset];
-  }),
+  [...Object.keys(CAST_ABILITIES), ...Object.keys(MULTI_SIGNATURES)].map(
+    (preset) => {
+      const originalIndex = ORIGINAL_CAST.indexOf(preset);
+      const id =
+        originalIndex < 0 ? "cast-" + preset : "friend-" + (originalIndex + 3);
+      return [id, preset];
+    },
+  ),
 );
 
 export const isStudioPng = (value) =>
@@ -389,28 +439,31 @@ export function castPreset(character) {
   const preset = character.preset ?? presetsById.get(character.id);
   if (
     typeof preset === "string" &&
-    (preset === "babashark" || Object.hasOwn(CAST_ABILITIES, preset))
+    (Object.hasOwn(MULTI_SIGNATURES, preset) ||
+      Object.hasOwn(CAST_ABILITIES, preset))
   )
     return preset;
 }
 
 export function getSignatureMoves(character) {
+  const preset = castPreset(character);
+  const multi = MULTI_SIGNATURES[preset];
   const ability = normalizeGeneratedAbility(character.ability);
   if (ability) {
     const { name, description, art, style } = ability;
-    return [
-      {
-        ...GENERATED_RULES[style],
-        id: "signature",
-        name,
-        description,
-        art,
-        visual: style,
-      },
-    ];
+    const move = {
+      ...GENERATED_RULES[style],
+      id: "signature",
+      name,
+      description,
+      art,
+      visual: style,
+    };
+    return preset === "zippy" || preset === "footjobofsteel"
+      ? [...multi, move]
+      : [move];
   }
-  const preset = castPreset(character);
-  if (preset === "babashark") return BABASHARK_MOVES;
+  if (multi) return multi;
   const move = preset
     ? CAST_ABILITIES[preset]
     : character.kind === "mint"

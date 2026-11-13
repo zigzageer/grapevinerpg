@@ -17,11 +17,6 @@ export function ServerLoader({
   children: (server?: ServerGame, town?: ServerTown) => React.ReactNode;
 }) {
   const path = window.location.pathname;
-  const isDemo =
-    !!(globalThis as { __MINT_ART__?: unknown }).__MINT_ART__ ||
-    window.location.protocol === "file:" ||
-    path === "/" ||
-    path === "/index.html";
   const guildId = serverIdFromPath(path);
   const [loaded, setLoaded] = useState<{
     server: ServerGame;
@@ -33,7 +28,7 @@ export function ServerLoader({
   const [attempt, setAttempt] = useState(0);
   const [studioOpen, setStudioOpen] = useState(false);
   useEffect(() => {
-    if (isDemo || !guildId) return;
+    if (!guildId) return;
     const controller = new AbortController();
     let loadedFromStudio = false;
     let cachedTown: { source: string; town: ServerTown } | undefined;
@@ -105,11 +100,10 @@ export function ServerLoader({
       clearInterval(interval);
       window.removeEventListener("focus", fetchGame);
     };
-  }, [guildId, isDemo, attempt]);
+  }, [guildId, attempt]);
   useEffect(() => {
     if (server) document.title = `${server.name} — Adventures of Mint`;
   }, [server?.name]);
-  if (isDemo) return children();
   if (server?.characters.length) return children(server, town);
   const spawn = town?.spawn ?? START;
   const camera = followCamera(
@@ -178,7 +172,7 @@ export function ServerLoader({
             <RefreshCw size={16} /> Check for updates
           </button>
         )}
-        <a href="/">Visit Adventures of Mint</a>
+        <a href="/">Visit Grapevine Clan</a>
       </section>
       {studioOpen && guildId && (
         <CharacterStudio

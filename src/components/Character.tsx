@@ -76,6 +76,110 @@ function BurgerBite() {
   );
 }
 
+function ZippyChew({ sprite, clipId }: { sprite: string; clipId: string }) {
+  return (
+    <g className="zippy-chew" aria-hidden="true">
+      <defs>
+        <clipPath id={clipId}>
+          <path d="M69.4 71.5Q75.6 70.9 81.5 71.6L81.5 76.2 80.4 77.8 79.2 78.7 79.1 81.4Q78.8 81.9 75.3 81.5L74.2 79.4Q71 78.9 70.6 77L69.4 75Z" />
+        </clipPath>
+      </defs>
+      {/* Sample the neighboring paper texture behind the moving mouth and noodles. */}
+      <g clipPath={`url(#${clipId})`}>
+        <use href={`#${sprite}`} transform="translate(-13 -2)" />
+        <g className="zippy-chew-mouth">
+          <use href={`#${sprite}`} />
+        </g>
+      </g>
+    </g>
+  );
+}
+
+function DrillBit() {
+  return (
+    <g transform="translate(33.7 104.5) rotate(14)" aria-hidden="true">
+      <path
+        d="M0-.8H-6.9l-1.45.8 1.45.8H0Z"
+        fill="#777675"
+        stroke="#242221"
+        strokeWidth=".35"
+        strokeLinejoin="round"
+      />
+      <path
+        className="drill-bit"
+        d="M-7.1-.6l.85 1.2m1.04-1.2.85 1.2m1.04-1.2.85 1.2m1.04-1.2.85 1.2"
+        stroke="#e2ded9"
+        strokeWidth=".46"
+        strokeLinecap="round"
+      />
+    </g>
+  );
+}
+
+function SarinaPuff({ facing }: { facing: number }) {
+  return (
+    <g
+      transform={`translate(${facing < 0 ? 150 : 0} 0) scale(${facing < 0 ? -1 : 1} 1)`}
+      aria-hidden="true"
+    >
+      <g transform="translate(42 139)">
+        <g className="sarina-walk-puff">
+          <path
+            d="M8 3Q2 9-6 6Q-14 9-19 4Q-26 5-27 0Q-31-5-24-8Q-21-14-13-11Q-8-15-3-10Q4-10 4-5Q10-4 8 3Z"
+            fill="#d4e5ad"
+            stroke="#708554"
+            strokeWidth="1.25"
+            strokeLinejoin="round"
+          />
+          <path
+            d="M-23-3q4-2 7 1m3-6q3-2 6 0m1 9q4-3 8-2"
+            fill="none"
+            stroke="#9aaf76"
+            strokeWidth="1"
+            strokeLinecap="round"
+          />
+        </g>
+      </g>
+    </g>
+  );
+}
+
+function JatGlasses() {
+  return (
+    <g aria-hidden="true">
+      <g
+        className="jat-glasses"
+        fill="none"
+        stroke="#211b1a"
+        strokeWidth="2.05"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M22 85.3Q18.8 84.9 17 87M58.4 85.1Q63.4 85 65.1 87.2M38 85.8Q40.4 84 43.2 85.8" />
+        <path d="M21.6 85.5Q24.5 83.5 31.5 83.6Q38.2 83.7 39.7 87.2Q40.5 89.7 38.7 96.1Q37 101 31.7 101Q25 101.7 22.7 98.8Q20.5 96 20.4 90.8Q20 87.4 21.6 85.5ZM43.1 85.5Q47 83.3 53.4 83.7Q59.1 83.8 60.1 87.1Q60.9 90.9 59.5 95.8Q58 100.7 51.8 101Q45.4 101.6 43.5 97.8Q41.9 94.6 41.7 89.8Q41.5 86.8 43.1 85.5Z" />
+      </g>
+      <g
+        transform="translate(21 131)"
+        fill="#d9985f"
+        stroke="#98653f"
+        strokeWidth=".35"
+      >
+        <g className="jat-arm">
+          <g className="jat-upper-arm">
+            <path d="M-3.7-.3 3.8.9Q3.8 3.6 3.1 7.3L2.5 10.6Q1.8 13.4-1 13.1Q-3.4 12.9-4.3 10.2Q-4.1 3.2-3.7-.3Z" />
+            <g transform="translate(-1.2 10.4)">
+              <g className="jat-forearm">
+                <path d="M-3-1.3Q.1-3.2 3.2-1.2L2.5 8Q1.6 9.6-1.2 9.2Q-3.7 8.9-3.8 6.6Z" />
+                <path d="M-3.8 5.1Q-1.7 3.7 1.6 5Q4.4 6.5 4 9.8Q3.6 13.5.4 14.2Q-3.4 14.9-5.3 11.7Q-6.5 8-3.8 5.1Z" />
+              </g>
+            </g>
+          </g>
+        </g>
+      </g>
+    </g>
+  );
+}
+
 function ChairRoll({ facing }: { facing: number }) {
   return (
     <>
@@ -130,10 +234,14 @@ function CharacterCutout({
   if (sprite) {
     const rolling = moving && !c.sprite && c.preset === "kawaiikitty";
     const eating = !c.sprite && c.preset === "steakbutterfan";
+    const chewing = !c.sprite && c.preset === "zippy";
+    const adjustingGlasses = !c.sprite && c.preset === "jat" && !portrait;
+    const spriteId = `zippy-sprite-${id}`;
     const motion = rolling ? " chair-rolling" : moving ? " walking" : "";
     const image = (
       <image
-        href={sprite}
+        id={chewing ? spriteId : undefined}
+        href={adjustingGlasses ? characterArtUrl("jat-rig") : sprite}
         x="0"
         y={c.preset === "zippy" ? 30 : 0}
         width="150"
@@ -143,6 +251,9 @@ function CharacterCutout({
     );
     return (
       <g className={`paper-person${motion}`}>
+        {moving && !c.sprite && c.preset === "flag-girl" && (
+          <SarinaPuff facing={facing} />
+        )}
         {eating ? (
           <g className="burger-eating">
             {image}
@@ -151,6 +262,11 @@ function CharacterCutout({
         ) : (
           image
         )}
+        {chewing && (
+          <ZippyChew sprite={spriteId} clipId={`zippy-mouth-${id}`} />
+        )}
+        {!c.sprite && c.preset === "footjobofsteel" && <DrillBit />}
+        {adjustingGlasses && <JatGlasses />}
         {!c.sprite && c.preset === "orrow" && <OrrowMouth />}
         {!c.sprite && c.preset === "babashark" && (
           <image

@@ -28,7 +28,7 @@ The user then named the game **Adventures of Mint** and supplied a round pepperm
 ## Added cast members
 
 - **Baguette**: white man with a strong square jaw, short-sided black hair with a longer swept top, charcoal jacket, and a baguette in hand. AI-generated transparent sprite at `public/characters/baguette-guy.png`.
-- **Sarina**: based on the supplied brown-haired avatar with a navy bow, gold bracelets, black skirt, and navy shirt; redesigned with an exaggerated muscular build. Her shirt features a golden lamassu (winged human-headed lion), and she holds the green-white-red Persian lion-and-sun flag. AI-generated transparent sprite at `public/characters/flag-girl.png`.
+- **Sarina** wears a dark green officer cap and shirt, a black skirt, and gold bracelets, and carries the Lion and Sun flag. The supplied transparent sprite is at `public/characters/flag-girl.png`. A green puff trails behind her when she walks.
 
 The illustrated cast members appear in the park and workshop. Local saves upgrade the cast once, preserving custom names and quest progress. The workshop can rename them, replace their art, or switch them to a standard editable cutout. Crew JSON exports preserve their built-in sprite references without embedding image data.
 
@@ -39,19 +39,19 @@ The illustrated cast members appear in the park and workshop. Local saves upgrad
 - **Ghost**: Black British woman in a plum hijab and sage-green long-sleeved top, holding a Bible in one hand and an oval loaf of bread in the other. AI-generated transparent sprite at `public/characters/ghost.png`. Existing saves add her once without resetting the crew or quest progress.
 
 - **Rocky**: Israeli Hasidic man in a black hat and coat, side curls, and an olive IDF vest. AI-generated transparent sprite at `public/characters/rocky.png`.
-- **Miel**: adult white woman with long brown hair, exaggerated lip-filler lips, bunny ears, and a stemmed glass of pink rosé. AI-generated transparent sprite at `public/characters/miel.png`.
-- **Zippy**: short, stocky, muscular gay man with a colorful floral shirt, rainbow wristband, and the requested “HIV +” and “I HAVE AIDS” arm patches. AI-generated transparent sprite at `public/characters/zippy.png`; rendered shorter than the other illustrated characters.
-- **Jat**: dark-brown-skinned Sri Lankan man with a strong jaw, a Sri Lankan flag shirt, and an Asuka coffee mug. AI-generated transparent sprite at `public/characters/jat.png`.
+- **Miel** has pink-tipped auburn hair, floppy bunny ears, gold hoops, a Star of David necklace, a black dress, and lace-up boots. Her reference-based sprite is at `public/characters/miel.png`.
+- **Zippy** wears an oversized olive uniform cap and sunglasses and chews noodles from a takeout carton. His reference-based sprite is at `public/characters/zippy.png`.
+- **Jat** has black curls, a green Bangladesh flag shirt, plaid trousers, and a placard. His glasses slip and he pushes them back up. His resting sprite is at `public/characters/jat.png` and his animated base is at `public/characters/jat-rig.png`.
 
 These four join existing saves in cast update 6 without replacing customized cast members or quest state. The crew sidebar scrolls to show the growing roster, and the workshop continues to support names, sprite replacement, and crew import/export.
 
 ## Free-roam additions and demo
 
-- **Loralei**: adult brown-haired white woman with makeup, a black vintage peaked cap, glossy black fashion coat, patterned tights and heels. Her initial image request was rejected by the image tool; the final sprite uses a fully clothed fashion outfit.
+- **Loralei** has long brown hair, dark sunglasses, an olive beret, and a glossy black outfit. Her reference-based sprite is at `public/characters/loralei.png`.
 - **Samira**: brown-skinned Arab woman with dark hair and extremely exaggerated cosmetic filler lips.
 - **Genesis**: brown-skinned man with a curly afro and glasses, holding a red leash attached to his little puppy. Both move together as one sprite.
 - **Kain**: green Pepe-style frog based on the supplied avatar, wearing gold glasses and a pinstripe three-piece suit.
-- **Footjobofsteel**: original muscular golden-yellow bear in a red athletic top and brown shorts. The reference-based image request was rejected; the final original design was generated without that reference.
+- **Footjobofsteel** wears blue nurse scrubs and white sneakers. His yellow drill spins faster during Drill Rush. His reference-based sprite is at `public/characters/footjobofsteel.png`.
 
 The character picker has 25 named playable characters, including Red Light, Peaches, Lin, Bashu, Orrow, Potato, and kawaiikitty. Cast version 10 adds those seven to older Mint saves and preserves customized friends, the selected character, and position. The Mint workshop supports up to 40 cast members.
 

@@ -19,6 +19,11 @@ const CAST_VISUALS = {
   },
   "simps-assemble": { visual: "burst", art: "/abilities/simps-assemble.webp" },
   chaz: { visual: "rush", art: "/abilities/chaz-corvette.webp" },
+  "diarrhea-spray": { visual: "spray" },
+  "needle-toss": { visual: "projectile" },
+  "fleshlight-volley": { visual: "projectile" },
+  "drill-rush": { visual: "drill" },
+  "first-aid": { visual: "burst" },
 };
 
 export function builtInFightSprite(character) {

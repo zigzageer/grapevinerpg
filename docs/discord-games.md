@@ -1,6 +1,6 @@
 # Discord server games
 
-Each Discord server has a roster at `public/games/<guild-id>/game.json` and a public game link such as `https://adventures-of-mint.vercel.app/mints-lounge-123456789012345678`. The ID prevents collisions between servers with the same name. Once created, a link stays stable even if the server is renamed. The root URL keeps the original Adventures of Mint cast and workshop.
+Each Discord server has a roster at `public/games/<guild-id>/game.json` and a public game link such as `https://thesharty.online/mints-lounge-123456789012345678`. The ID prevents collisions between servers with the same name. Once created, a link stays stable even if the server is renamed. The homepage opens Grapevine, and `/mint` opens the original snowy town. Both use the Adventures of Mint cast and workshop.
 
 ## Commands
 

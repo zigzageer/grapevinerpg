@@ -27,6 +27,8 @@ const MOTION = {
   burst: [-7, 11, 19, 5],
   projectile: [-9, 14, 11, 3],
   rush: [-17, 74, 131, 38],
+  drill: [-12, 82, 152, 38],
+  spray: [-4, 5, 8, 3],
   heal: [0, 2, 0, 0],
   status: [0, 0, 0, 0],
 };
@@ -75,9 +77,14 @@ function timeline(match) {
       !ability && ["Burning", "Stunned", "Asleep"].includes(event.move)
         ? event.move
         : null;
-    const visual = ["burst", "projectile", "rush", "strike"].includes(
-      event.visual,
-    )
+    const visual = [
+      "burst",
+      "projectile",
+      "rush",
+      "strike",
+      "spray",
+      "drill",
+    ].includes(event.visual)
       ? event.visual
       : ability
         ? "burst"
@@ -349,9 +356,9 @@ function moveEffect(move, phase, poses, art, scale) {
     art &&
     move.ability &&
     (contact ||
-      (phase === 1 && ["rush", "projectile"].includes(move.style)) ||
+      (phase === 1 && ["rush", "projectile", "spray"].includes(move.style)) ||
       (recovery && move.style === "burst" && move.after[move.target] > 0));
-  const layer = showArt ? center(art, x, y, scale) : null;
+  let layer = showArt ? center(art, x, y, scale) : null;
   const color = move.snowball
     ? "#e2f6ff"
     : move.ability
@@ -379,6 +386,40 @@ function moveEffect(move, phase, poses, art, scale) {
         fill="#f9a46a" stroke="#522f31" stroke-width="2"/>
         ${star(x + direction * 20, y - 7, 0.38, "#ffca78")}`;
     }
+  } else if (move.style === "spray" && phase > 0) {
+    const start = actor.x + direction * 29;
+    const end = target.x + direction * 28;
+    const reach = contact ? end : start + (end - start) * 0.62;
+    if (!recovery) {
+      shapes = `<path d="M${start} 170Q${(start + reach) / 2} 144 ${reach} 163"
+        fill="none" stroke="#5d331c" stroke-width="11" stroke-linecap="round"/>
+        <path d="M${start} 168Q${(start + reach) / 2} 148 ${reach} 160"
+        fill="none" stroke="#ac733d" stroke-width="3" stroke-linecap="round"/>`;
+    }
+    if (showArt) {
+      const effectX =
+        direction === 1
+          ? reach - art.raw.width / scale / 2
+          : reach + art.raw.width / scale / 2;
+      layer = center(art, effectX, 160, scale);
+      if (contact) shapes = "";
+    }
+    if (contact || recovery) {
+      shapes += `<path d="M${target.x - 13} ${recovery ? 172 : 155}q-7 13-2 16t7-14Z
+        M${target.x + 11} ${recovery ? 189 : 167}q-5 14 0 14t5-14Z"
+        fill="#85502e" stroke="#5d331c" stroke-width="1.4"/>`;
+    }
+  } else if (move.style === "drill" && phase < 3) {
+    // The cutout holds its drill on the viewer's left. The rig faces inward.
+    const drillX = actor.x + direction * 41;
+    const drillY = GROUND - actor.lift - 67;
+    shapes = `<g transform="translate(${drillX} ${drillY}) scale(${direction} 1)">
+      <path d="M-2 1 11-2 14-1 12 2 0 4Z" fill="#d8d9d3" stroke="#4f5150" stroke-width="1"/>
+      <path d="M0 0l4 4m1-6 4 4m1-5 3 3" stroke="${phase === 1 ? "#fff6cb" : "#7c8180"}" stroke-width="1.3"/>
+      </g>`;
+    if (phase > 0) shapes += trails(actor.x, drillY + 21, direction, "#ffe28b");
+    if (contact)
+      shapes += star(drillX + direction * 14, drillY, 0.96, "#ffe28b");
   } else if (move.style === "projectile" && phase < 3) {
     shapes = trails(x, y, direction, color);
     if (move.snowball && !contact) {
@@ -524,31 +565,29 @@ async function encode(fight, sources, profile) {
     arena(sources.background, width, height),
     Promise.all(
       fight.fighters.map(
-        async ({ id }, side) =>
+        async ({ id, sprite }, side) =>
           (await loadArt(
             sources.sprites?.[id],
             Math.round(149 * scale),
             Math.round(156 * scale),
             true,
+            side === 0 && sprite === "/characters/footjobofsteel.png",
           )) ?? silhouette(side, scale),
       ),
     ),
     Promise.all(
-      fight.fighters.map(({ id }, side) =>
-        loadArt(
+      fight.fighters.map(({ id }, side) => {
+        const effect = fight.moves.find(
+          (move) => move.actor === side && move.ability,
+        );
+        return loadArt(
           sources.effects?.[id],
-          Math.round(116 * scale),
+          Math.round((effect?.style === "spray" ? 236 : 116) * scale),
           Math.round(102 * scale),
           true,
-          side === 1 &&
-            fight.moves.some(
-              (move) =>
-                move.actor === side &&
-                move.ability &&
-                (move.style === "projectile" || move.style === "rush"),
-            ),
-        ),
-      ),
+          side === 1 && ["projectile", "rush", "spray"].includes(effect?.style),
+        );
+      }),
     ),
   ]);
   const downed = await fallen(

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowRight,
   Check,
@@ -7,7 +7,7 @@ import {
   Compass,
   Keyboard,
   MapPin,
-  Map,
+  Map as MapIcon,
   Maximize2,
   Menu,
   Pencil,
@@ -50,12 +50,19 @@ import {
   studioRequest,
   type StudioGame,
 } from "./game/studio";
+import { mintStudioSeed } from "./game/studio-seed";
+import { publicMintRoster, useTownPresence } from "./game/presence";
 import { CrewEditor } from "./components/CrewEditor";
 import { TouchJoystick } from "./components/TouchJoystick";
 import { TownMap } from "./components/TownMap";
 import { TOWN_NAME, districtAt } from "./game/locations";
 import { ServerLoader } from "./components/ServerLoader";
-import { loadServerSave, serverSaveKey, type ServerGame } from "./game/server";
+import {
+  loadServerSave,
+  parseServerGame,
+  serverSaveKey,
+  type ServerGame,
+} from "./game/server";
 import {
   parseServerTown,
   serverDistrictAt,
@@ -95,13 +102,19 @@ function loadDemo(saveKey = SAVE_KEY, town?: ServerTown): SaveGame {
 }
 
 export default function App() {
-  const matchId = matchIdFromPath(window.location.pathname);
+  const pathname = window.location.pathname;
+  const matchId = matchIdFromPath(pathname);
   if (matchId) return <MatchReplay id={matchId} />;
-  if (/^\/grapevine\/?$/.test(window.location.pathname))
+  if (!studioAvailable() || /^\/mint\/?$/.test(pathname)) return <Game />;
+  if (
+    pathname === "/" ||
+    pathname === "/index.html" ||
+    /^\/grapevine\/?$/.test(pathname)
+  )
     return (
       <Game town={parseServerTown(grapevineTown, grapevineTown.guildId)} />
     );
-  if (/^\/town-preview\/?$/.test(window.location.pathname)) {
+  if (/^\/town-preview\/?$/.test(pathname)) {
     const server: ServerGame = {
       ...sampleGame,
       version: 1,
@@ -152,11 +165,14 @@ function Game({
     ),
     [player, setPlayer] = useState<Point>(game.player);
   const [moving, setMoving] = useState(false),
-    [facing, setFacing] = useState(1),
+    [facing, setFacing] = useState<-1 | 1>(1),
     [target, setTarget] = useState<Point | null>(null);
   const [openPanel, setPanel] = useState<Panel>(null),
     [search, setSearch] = useState("");
   const sharedUpdatedAt = useRef(0);
+  const [publicCrew, setPublicCrew] = useState(
+    () => server?.characters ?? mintStudioSeed.characters,
+  );
   const [editorCharacter, setEditorCharacter] = useState<Character>();
   const [interaction, setInteraction] = useState<{
     actor: Character;
@@ -200,6 +216,35 @@ function Game({
   const panel = openPanel ?? (active ? null : "characters");
   const tvLook = game.tvLook !== false;
   const canUseStudio = !preview && studioAvailable();
+  const publicRoster = useMemo(
+    () => new Map(publicCrew.map((c) => [c.id, c])),
+    [publicCrew],
+  );
+  const publicCharacter = publicRoster.get(activeKey);
+  const presenceCharacterId =
+    active &&
+    publicCharacter &&
+    active.kind === publicCharacter.kind &&
+    active.preset === publicCharacter.preset &&
+    active.sprite === publicCharacter.sprite
+      ? activeKey
+      : undefined;
+  const worldId = server?.guildId ?? (clan ? "grapevine" : "mint");
+  const presence = useTownPresence(
+    canUseStudio ? worldId : undefined,
+    presenceCharacterId,
+    { ...player, moving, facing },
+    !!panel,
+    town?.walkArea,
+  );
+  const remotePlayers = useMemo(
+    () =>
+      presence.flatMap((p) => {
+        const character = publicRoster.get(p.characterId);
+        return character ? [{ ...p, character }] : [];
+      }),
+    [presence, publicRoster],
+  );
   walkArea.current = town?.walkArea;
   state.current = game;
   blocked.current = !!panel;
@@ -307,6 +352,7 @@ function Game({
   }, [spawn, stop, town]);
   useEffect(() => {
     if (!server) return;
+    setPublicCrew(server.characters);
     setGame((g) => ({
       ...g,
       crew: server.characters,
@@ -325,12 +371,20 @@ function Game({
           undefined,
           controller.signal,
         );
+        const updatedAt = Date.parse(shared.updatedAt);
         if (
           controller.signal.aborted ||
-          Date.parse(shared.updatedAt) <= sharedUpdatedAt.current
+          shared.guildId !== "mint" ||
+          !Number.isFinite(updatedAt) ||
+          updatedAt <= sharedUpdatedAt.current ||
+          !Array.isArray(shared.characters) ||
+          shared.characters.length > MINT_CREW_LIMIT
         )
           return;
-        sharedUpdatedAt.current = Date.parse(shared.updatedAt);
+        const publicCharacters = publicMintRoster(shared.characters);
+        if (publicCharacters.length !== shared.characters.length) return;
+        sharedUpdatedAt.current = updatedAt;
+        setPublicCrew(publicCharacters);
         const applied = readAppliedVersions(versionScope);
         setGame((current) => {
           const crew = mergeStudioCrew(current.crew, shared, applied);
@@ -604,6 +658,7 @@ function Game({
               crew={game.crew}
               activeKey={activeKey}
               target={target}
+              remotePlayers={remotePlayers}
               townName={townName}
               serverTown={town}
               paused={!!panel}
@@ -672,7 +727,7 @@ function Game({
                 aria-label="Town map"
                 onClick={() => open("map")}
               >
-                <Map size={21} />
+                <MapIcon size={21} />
               </button>
               {canFullscreen && (
                 <button
@@ -864,7 +919,7 @@ function Game({
               <ChevronRight size={17} />
             </button>
             {!server && canUseStudio && (
-              <a className="button secondary" href={clan ? "/" : "/grapevine"}>
+              <a className="button secondary" href={clan ? "/mint" : "/"}>
                 <MapPin size={18} />
                 {clan ? "Visit Adventures of Mint" : "Visit Grapevine Clan"}
               </a>
@@ -877,7 +932,7 @@ function Game({
               </button>
             )}
             <button onClick={() => open("map")}>
-              <Map size={20} />
+              <MapIcon size={20} />
               <span>Town map</span>
               <ChevronRight size={17} />
             </button>
@@ -929,13 +984,17 @@ function Game({
           initialCharacter={editorCharacter}
           onClose={() => setPanel("characters")}
           onPublished={(shared, characterId) => {
+            const publicCharacters = server
+              ? parseServerGame(shared, server.guildId).characters
+              : publicMintRoster(shared.characters);
             sharedUpdatedAt.current = Date.parse(shared.updatedAt);
+            setPublicCrew(publicCharacters);
             const applied = readAppliedVersions(versionScope);
             delete applied[characterId];
             setGame((current) => ({
               ...current,
               crew: server
-                ? shared.characters
+                ? publicCharacters
                 : mergeStudioCrew(current.crew, shared, applied),
             }));
             if (!server) {

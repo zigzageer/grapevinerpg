@@ -136,7 +136,11 @@ function verifyReplay(match) {
   assert.ok(match.events.length > 0 && match.events.length <= 23);
   for (const [index, event] of match.events.entries()) {
     assert.equal(event.seq, index + 1);
-    assert.ok(["strike", "burst", "rush", "projectile"].includes(event.visual));
+    assert.ok(
+      ["strike", "burst", "rush", "projectile", "spray", "drill"].includes(
+        event.visual,
+      ),
+    );
     assert.ok(health.get(event.actorId) > 0);
     assert.ok(health.get(event.targetId) > 0);
     assert.notEqual(event.actorId, event.targetId);
@@ -209,6 +213,42 @@ test("auto combat is deterministic, symmetric and replays fixed signature effect
     JSON.stringify(wins),
   );
   assert.deepEqual(effects, new Set(["healing", "sleep", "burn", "stun"]));
+});
+
+test("Zippy and Footjobofsteel use their new moves in Discord auto fights", () => {
+  const moves = new Map([
+    [
+      "Diarrhea Spray",
+      { visual: "spray", art: "/abilities/zippy-diarrhea-spray.webp" },
+    ],
+    [
+      "Needle Toss",
+      { visual: "projectile", art: "/abilities/zippy-needle-toss.webp" },
+    ],
+    [
+      "Fleshlight Toss",
+      { visual: "projectile", art: "/abilities/zippy-fleshlight-volley.webp" },
+    ],
+    ["Drill Rush", { visual: "drill" }],
+    ["First Aid", { visual: "burst", heal: true }],
+  ]);
+  for (let index = 0; index < 48 && moves.size; index++) {
+    const seed = Math.imul(index, 0x9e3779b9) >>> 0;
+    const match = simulate(seed, [{ id: "friend-9" }, { id: "friend-15" }]);
+    verifyReplay(match);
+    for (const event of match.events.filter(({ kind }) => kind === "ability")) {
+      const expected = moves.get(event.move);
+      if (!expected) continue;
+      const {
+        players: [fighter],
+      } = match.sides[event.actorId === "left" ? 0 : 1];
+      assert.equal(event.visual, expected.visual);
+      assert.equal(fighter.abilityArt, expected.art);
+      assert.equal(event.actorHp !== undefined, expected.heal === true);
+      moves.delete(event.move);
+    }
+  }
+  assert.deepEqual([...moves.keys()], []);
 });
 
 test("legacy fighters are guild scoped, owners can equip multiple choices, and pause survives restart", async (t) => {

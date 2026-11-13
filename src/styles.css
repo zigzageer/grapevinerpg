@@ -776,6 +776,144 @@ button:active:not(:disabled) {
     transform: translate(-15px, 8px);
   }
 }
+.zippy-chew-mouth {
+  transform-origin: 75px 72.3px;
+  animation: zippy-chew 1.5s step-end infinite;
+}
+@keyframes zippy-chew {
+  0%,
+  84% {
+    transform: none;
+  }
+  14%,
+  38%,
+  62% {
+    transform: translateY(0.8px) scaleY(0.58);
+  }
+  26%,
+  50%,
+  73% {
+    transform: translateY(0.2px) scaleY(0.88);
+  }
+}
+.drill-bit {
+  transform-origin: 0 0;
+  animation: drill-bit-turn 0.27s linear infinite;
+}
+.battle-fighter[data-motion="drill-rush"] .drill-bit {
+  animation-duration: 0.11s;
+}
+.sarina-walk-puff {
+  opacity: 0;
+  transform-origin: 0 0;
+  animation: sarina-walk-puff 0.95s ease-out infinite;
+}
+.jat-glasses,
+.jat-arm,
+.jat-upper-arm,
+.jat-forearm {
+  animation-duration: 3.8s;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+}
+.jat-glasses {
+  transform-origin: 41px 85px;
+  animation-name: jat-glasses-slip;
+}
+.jat-arm {
+  transform-origin: 0 0;
+  animation-name: jat-arm-reach;
+}
+.jat-upper-arm {
+  transform-origin: 0 0;
+  animation-name: jat-elbow-rise;
+}
+.jat-forearm {
+  transform-origin: 0 0;
+  animation-name: jat-forearm-bend;
+}
+.town-svg[data-paused="true"]
+  :is(
+    .zippy-chew-mouth,
+    .drill-bit,
+    .sarina-walk-puff,
+    .jat-glasses,
+    .jat-arm,
+    .jat-upper-arm,
+    .jat-forearm
+  ) {
+  animation-play-state: paused;
+}
+@keyframes drill-bit-turn {
+  50% {
+    opacity: 0.45;
+    transform: scaleY(-1);
+  }
+}
+@keyframes sarina-walk-puff {
+  0% {
+    opacity: 0;
+    transform: scale(0.45);
+  }
+  24% {
+    opacity: 0.94;
+  }
+  76%,
+  100% {
+    opacity: 0;
+    transform: translate(-28px, -6px) scale(1.14);
+  }
+}
+@keyframes jat-glasses-slip {
+  0%,
+  34%,
+  70%,
+  100% {
+    transform: none;
+  }
+  52%,
+  63% {
+    transform: translateY(4.3px) rotate(-3deg);
+  }
+}
+@keyframes jat-arm-reach {
+  0%,
+  51%,
+  84%,
+  100% {
+    transform: none;
+  }
+  63%,
+  70% {
+    transform: scale(1, 1.48);
+  }
+}
+@keyframes jat-elbow-rise {
+  0%,
+  51%,
+  84%,
+  100% {
+    transform: none;
+  }
+  63%,
+  70% {
+    transform: rotate(166deg);
+  }
+}
+@keyframes jat-forearm-bend {
+  0%,
+  51%,
+  84%,
+  100% {
+    transform: none;
+  }
+  63% {
+    transform: rotate(42deg);
+  }
+  70% {
+    transform: rotate(36deg);
+  }
+}
 .chair-roll-streaks {
   opacity: 0.72;
 }

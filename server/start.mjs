@@ -7,6 +7,7 @@ import { createVercelVerifier } from "./vercel-auth.mjs";
 import { createStudioServer } from "./studio-http.mjs";
 import { MatchService } from "./match-service.mjs";
 import { createFightGifRenderer, FightGifQueue } from "./fight-gif-queue.mjs";
+import { Presence } from "./presence.mjs";
 
 const env = process.env;
 for (const key of [
@@ -40,20 +41,27 @@ const fightGifs = new FightGifQueue({
     readStudioImage: (id) => store.image(id),
   }),
 });
-const matchTimer = setInterval(() => {
+const presence = new Presence({
+  canUseCharacter: (worldId, characterId) =>
+    store.character(worldId === "grapevine" ? "mint" : worldId, characterId)
+      ?.visible === 1,
+});
+const maintenanceTimer = setInterval(() => {
+  presence.sweep();
   try {
     matches.sweep();
   } catch (error) {
     console.error("[matches] Could not advance a match.", error.message);
   }
 }, 1000);
-matchTimer.unref();
+maintenanceTimer.unref();
 const server = createStudioServer({
   service,
   secret: env.MINT_STUDIO_SECRET,
   matches,
   matchBotSecret: env.MINT_MATCH_BOT_SECRET,
   fightGifs,
+  presence,
   verifyVercel: createVercelVerifier({
     teamSlug: env.MINT_STUDIO_VERCEL_TEAM_SLUG || "tensymain-8759s-projects",
     teamId: env.MINT_STUDIO_VERCEL_TEAM_ID || "team_YMxRg3j0ixQCGCc8wjrgWSZz",
@@ -76,7 +84,7 @@ server.listen(
 );
 for (const signal of ["SIGTERM", "SIGINT"])
   process.once(signal, () => {
-    clearInterval(matchTimer);
+    clearInterval(maintenanceTimer);
     service.close();
     let gifsClosed = false;
     void fightGifs.close().finally(() => {

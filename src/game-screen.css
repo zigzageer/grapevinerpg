@@ -47,6 +47,18 @@ body {
   height: 100%;
   display: block;
 }
+.remote-citizen {
+  pointer-events: none;
+  transition: transform 320ms linear;
+}
+.remote-citizen .nameplate {
+  opacity: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .remote-citizen {
+    transition: none;
+  }
+}
 .play-screen[data-tv-look="true"] .world-layer {
   filter: saturate(1.045) contrast(1.025) brightness(1.008);
 }

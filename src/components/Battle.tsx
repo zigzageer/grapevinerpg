@@ -22,14 +22,18 @@ import {
   CircleStop,
   Coffee,
   Croissant,
+  Cross,
+  Cylinder,
   Dog,
+  Drill,
+  Droplets,
   Flag,
   Flame,
-  Flower2,
   Footprints,
   Gem,
   GraduationCap,
   Heart,
+  HeartPlus,
   MessageCircleMore,
   Moon,
   PartyPopper,
@@ -40,6 +44,7 @@ import {
   Sparkles,
   Sword,
   Swords,
+  Syringe,
   UsersRound,
   Wine,
   Zap,
@@ -77,6 +82,7 @@ import {
 } from "../game/model";
 import { BabasharkEffects } from "./BabasharkEffects";
 import { CharacterArt } from "./Character";
+import "../cast-battle.css";
 
 interface Props {
   actor: Character;
@@ -94,6 +100,11 @@ const IMPACT_CUES: Partial<Record<AbilityVisual, readonly [number, number]>> = {
   "kick-the-baby": [1720, 0.58],
   "simps-assemble": [1700, 0.59],
   chaz: [2150, 0.71],
+  "diarrhea-spray": [1270, 0.37],
+  "needle-toss": [1240, 0.54],
+  "fleshlight-volley": [1350, 0.54],
+  "drill-rush": [1390, 0.53],
+  "first-aid": [1110, 0.46],
 };
 const GENESIS = DEFAULT_CREW.find(
   (character) => character.preset === "genesis",
@@ -106,7 +117,8 @@ function affectsActor(event: BattleEvent) {
     event.move === "stun" ||
     event.move === "sleep" ||
     event.move === "snack" ||
-    event.visual === "simps-assemble"
+    event.visual === "simps-assemble" ||
+    event.visual === "first-aid"
   );
 }
 
@@ -140,6 +152,11 @@ function Art({ src, fallback }: { src: string; fallback: ReactNode }) {
   ) : (
     <img src={src} alt="" draggable={false} onError={() => setFailed(true)} />
   );
+}
+
+function battleAbilityArt(url?: string) {
+  const bundled = url?.match(/^\/abilities\/([\w-]+)\.webp$/)?.[1];
+  return bundled ? abilityArtUrl(bundled) : url;
 }
 
 function BattleMeter({
@@ -284,7 +301,6 @@ const SIGNATURE_ICONS: Partial<
   ghost: Sandwich,
   rocky: GraduationCap,
   miel: Wine,
-  zippy: Flower2,
   jat: Coffee,
   loralei: Footprints,
   samira: Heart,
@@ -313,11 +329,58 @@ function signatureIcon(
   if (visual === "kick-the-baby") return Baby;
   if (visual === "simps-assemble") return Banknote;
   if (visual === "chaz") return CarFront;
+  if (visual === "diarrhea-spray") return Droplets;
+  if (visual === "needle-toss") return Syringe;
+  if (visual === "fleshlight-volley") return Cylinder;
+  if (visual === "drill-rush") return Drill;
+  if (visual === "first-aid") return HeartPlus;
   if (character.kind === "mint") return Candy;
   const preset =
     character.preset ??
     DEFAULT_CREW.find(({ id }) => id === character.id)?.preset;
   return (preset && SIGNATURE_ICONS[preset]) || Sparkles;
+}
+
+function CastAbilityEffect({
+  event,
+  art,
+  Icon,
+}: {
+  event: BattleEvent;
+  art?: string;
+  Icon: LucideIcon;
+}) {
+  switch (event.visual) {
+    case "diarrhea-spray":
+      return (
+        <div className="zippy-spray">
+          <span>{art ? <Art src={art} fallback={<Icon />} /> : <Icon />}</span>
+        </div>
+      );
+    case "needle-toss":
+    case "fleshlight-volley":
+      return Array.from({ length: event.hits ?? 1 }, (_, index) => (
+        <span
+          className="zippy-throw"
+          key={index}
+          style={{ "--throw-index": index } as CSSProperties}
+        >
+          {art ? <Art src={art} fallback={<Icon />} /> : <Icon />}
+        </span>
+      ));
+    case "drill-rush":
+      return <Zap className="nurse-drill-impact" />;
+    case "first-aid":
+      return (
+        <div className="nurse-first-aid">
+          <HeartPlus />
+          <Cross />
+          <Cross />
+        </div>
+      );
+    default:
+      return null;
+  }
 }
 
 function BattleEffects({
@@ -346,8 +409,9 @@ function BattleEffects({
       (character) =>
         character.id === fallback.id || character.preset === fallback.preset,
     ) ?? fallback;
+  const art = battleAbilityArt(event.art);
   const targetArt =
-    event.visual === "tag-team" ? abilityArtUrl("tag-team") : event.art;
+    event.visual === "tag-team" ? abilityArtUrl("tag-team") : art;
   const projectile =
     event.move === "snowball" ||
     event.move === "spark" ||
@@ -358,10 +422,13 @@ function BattleEffects({
       ? Snowflake
       : Flame;
   const impact =
-    targetArt || event.visual === "burst" || event.visual === "rush";
+    event.visual === "tag-team" ||
+    event.visual === "burst" ||
+    event.visual === "rush";
   return (
     <div className="battle-effects">
       <BabasharkEffects event={event} source={source} />
+      <CastAbilityEffect event={event} art={art} Icon={EffectIcon} />
       {event.visual === "grace" && (
         <>
           <div className="battle-grace" data-guest="grace">
@@ -390,11 +457,7 @@ function BattleEffects({
       )}
       {projectile && (
         <span className="battle-projectile">
-          {event.art ? (
-            <Art src={event.art} fallback={<EffectIcon />} />
-          ) : (
-            <EffectIcon />
-          )}
+          {art ? <Art src={art} fallback={<EffectIcon />} /> : <EffectIcon />}
         </span>
       )}
       {impact && !projectile && (
@@ -406,7 +469,7 @@ function BattleEffects({
           )}
         </span>
       )}
-      {hit && !blocked && (
+      {hit && !blocked && event.visual !== "diarrhea-spray" && (
         <div className="battle-sparks">
           {Array.from({ length: event.hits ?? 1 }, (_, index) => (
             <i key={index} style={{ "--hit-index": index } as CSSProperties} />
@@ -481,6 +544,10 @@ function Battlefield({
           ] as const
         ).map(([side, character]) => {
           const motion = stageMotion(event, side, character);
+          const pointsDrillAtTarget =
+            motion === "drill-rush" &&
+            character.preset === "footjobofsteel" &&
+            !character.sprite;
           return (
             <div
               key={side}
@@ -502,7 +569,7 @@ function Battlefield({
               <div className="duo-motion">
                 <Cutout
                   character={character}
-                  mirrored={side === "opponent"}
+                  mirrored={pointsDrillAtTarget !== (side === "opponent")}
                   moving={motion === "chair-charge"}
                 />
               </div>
@@ -540,6 +607,11 @@ const SIGNATURE_SLOTS: Record<SignatureMoveId, WheelSlot> = {
   "kick-the-baby": "heavy",
   "simps-assemble": "spark",
   chaz: "brace",
+  "diarrhea-spray": "signature",
+  "needle-toss": "heavy",
+  "fleshlight-volley": "spark",
+  "drill-rush": "signature",
+  "first-aid": "spark",
 };
 
 interface BattleCommand {
@@ -581,9 +653,10 @@ function BattleCommands({
   const attackCommand = (id: MoveId): BattleCommand => {
     const move = getMove(battle.player, id)!;
     const basic = isBasicMove(id);
+    const slot = basic ? id : SIGNATURE_SLOTS[id];
     return {
       id,
-      slot: basic ? id : SIGNATURE_SLOTS[id],
+      slot: id === "signature" && signatures.length > 1 ? "brace" : slot,
       Icon: basic ? MOVE_ICONS[id] : signatureIcon(actor, move.visual),
       name: move.name,
       description: move.description,
@@ -591,7 +664,7 @@ function BattleCommands({
       label: `Use ${move.name}`,
       disabled: battle.player.pp < move.cost,
       run: () => dispatch({ type: "choose", move: id }),
-      art: move.art,
+      art: battleAbilityArt(move.art),
     };
   };
   const mainCommands: BattleCommand[] = [

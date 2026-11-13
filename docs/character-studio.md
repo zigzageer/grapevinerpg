@@ -18,6 +18,8 @@ The installed service is `mint-character-studio.service`, with application files
 
 Vercel production settings include `MINT_STUDIO_ORIGIN` and `MINT_STUDIO_CA`, which contains the public TLS CA certificate. Enable project OIDC with the team issuer. Backend defaults identify the Adventures of Mint project. `MINT_STUDIO_VERCEL_TEAM_SLUG`, `MINT_STUDIO_VERCEL_TEAM_ID`, `MINT_STUDIO_VERCEL_PROJECT_NAME`, and `MINT_STUDIO_VERCEL_PROJECT_ID` support explicitly configured deployments.
 
+The same bridge forwards player position updates at `/api/studio/presence`. The Ubuntu service keeps active players in memory for each town and expires them after 14 seconds without an update. Browser sessions have independent IDs, even when players choose the same character. The roster, local saves, and combat use their existing storage.
+
 Ubuntu settings include `MINT_STUDIO_SECRET`, `MINT_STUDIO_DATA_DIR`, `MINT_STUDIO_SEED_PATH`, `MINT_STUDIO_TLS_KEY`, and `MINT_STUDIO_TLS_CERT`. The service runs Node 22.13+ or 24 and needs `sharp` and `jose`. Generate an initial cast seed with `node scripts/seed-studio.mjs`. Existing data takes precedence over the initial seed.
 
 The website build publishes the built-in cast at `/games/mint-studio.json`. The studio checks that manifest when the roster is requested or an edit targets a missing character. It checks at most once a minute and adds missing characters with their original art and descriptions. The database retains existing characters, versions, and jobs. The startup seed also works when the website is unavailable. The Mint studio supports 40 characters. Discord server towns support 24.

@@ -20,6 +20,10 @@
       "destination": "/index.html"
     },
     {
+      "source": "/mint",
+      "destination": "/index.html"
+    },
+    {
       "source": "/wars/:matchId",
       "destination": "/index.html"
     }

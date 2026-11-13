@@ -10,15 +10,17 @@ export type SignatureMoveId =
   | "diddy-party"
   | "kick-the-baby"
   | "simps-assemble"
-  | "chaz";
+  | "chaz"
+  | "diarrhea-spray"
+  | "needle-toss"
+  | "fleshlight-volley"
+  | "drill-rush"
+  | "first-aid";
 export type MoveId = BasicMoveId | SignatureMoveId;
 export type AbilityVisual =
+  | Exclude<SignatureMoveId, "signature">
   | "grace"
   | "tag-team"
-  | "diddy-party"
-  | "kick-the-baby"
-  | "simps-assemble"
-  | "chaz"
   | "burst"
   | "projectile"
   | "rush";

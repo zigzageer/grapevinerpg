@@ -3,6 +3,7 @@ import { isIP } from "node:net";
 import https from "node:https";
 
 export const MAX_BODY = 3_500_000;
+export const PRESENCE_BODY_LIMIT = 1024;
 export function canonicalIp(input) {
   const value = String(input || "").trim();
   if (isIP(value) === 4) return value;

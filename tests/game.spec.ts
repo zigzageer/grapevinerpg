@@ -54,7 +54,7 @@ test("residents talk and roam while street traffic and the winter parade pass th
   const start = new Date("2026-11-11T12:00:00Z");
   await page.clock.install({ time: start });
   await page.clock.pauseAt(new Date(start.getTime() + 1000));
-  await page.goto("/");
+  await page.goto("/mint");
   await startAsMint(page);
 
   const cartman = page.getByRole("button", { name: "Talk to Eric Cartman" });
@@ -90,7 +90,7 @@ test("residents talk and roam while street traffic and the winter parade pass th
 test("character interactions animate a kiss and preserve the player until Play as is chosen", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/mint");
   await startAsMint(page);
   const sprite = page.getByTestId("player-sprite");
   const x = await sprite.getAttribute("data-x");
@@ -129,7 +129,7 @@ test("a complete duel supports timed attacks, blocks, snacks, status effects and
   page.on("pageerror", (error) => errors.push(error.message));
   const startTime = new Date("2026-11-11T12:00:00Z");
   await page.clock.install({ time: startTime });
-  await page.goto("/");
+  await page.goto("/mint");
   await startAsMint(page);
   await page.clock.pauseAt(new Date(startTime.getTime() + 60_000));
   const position = await page
@@ -226,7 +226,7 @@ test("a complete duel supports timed attacks, blocks, snacks, status effects and
 test("leaving a duel cancels pending timing and restores normal controls", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/mint");
   await startAsMint(page);
   await page
     .getByRole("button", { name: "Interact with Sarina", exact: true })
@@ -263,7 +263,7 @@ for (const viewport of [
     });
     const page = await context.newPage();
     try {
-      await page.goto("/");
+      await page.goto("/mint");
       await startAsMint(page);
       await pause(page);
       await page
@@ -315,7 +315,7 @@ test("the game fills the screen immediately and every character can be played", 
 }) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
-  await page.goto("/");
+  await page.goto("/mint");
   await expect(
     page.getByRole("dialog", { name: "Choose a character" }),
   ).toBeVisible();
@@ -365,7 +365,7 @@ test("blindian stays taller in duels and calls in Jat and Genesis", async ({
 }) => {
   const time = new Date("2026-11-11T12:00:00Z");
   await page.clock.install({ time });
-  await page.goto("/");
+  await page.goto("/mint");
   const choices = await picker(page);
   await choices
     .getByRole("button", { name: "Play as blindian", exact: true })
@@ -405,7 +405,7 @@ test("blindian stays taller in duels and calls in Jat and Genesis", async ({
   const tagTeam = page.locator('.duo-stage[data-visual="tag-team"]');
   await expect(tagTeam.locator('[data-guest="jat"] image')).toHaveAttribute(
     "href",
-    "/characters/jat.png",
+    "/characters/jat-rig.png",
   );
   await expect(tagTeam.locator('[data-guest="genesis"] image')).toHaveAttribute(
     "href",
@@ -432,7 +432,7 @@ test("David calls Grace for the kiss and the CUCK hit", async ({ page }) => {
   await page.addInitScript(() => {
     Math.random = () => 0.99;
   });
-  await page.goto("/");
+  await page.goto("/mint");
   await page
     .getByRole("button", { name: "Play as David", exact: true })
     .click();
@@ -461,7 +461,7 @@ test("babashark brings her daughter and can use all four abilities", async ({
 }) => {
   const time = new Date("2026-11-11T12:00:00Z");
   await page.clock.install({ time });
-  await page.goto("/");
+  await page.goto("/mint");
   await page
     .getByRole("button", { name: "Play as babashark", exact: true })
     .click();
@@ -543,7 +543,7 @@ test("babashark brings her daughter and can use all four abilities", async ({
 test("Orrow chatters at rest and kawaiikitty rolls without a walking hop", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/mint");
   await page
     .getByRole("button", { name: "Play as Orrow", exact: true })
     .click();
@@ -572,7 +572,7 @@ test("Orrow chatters at rest and kawaiikitty rolls without a walking hop", async
 });
 
 test("steakbutterfan keeps chewing in town and fights", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/mint");
   await page
     .getByRole("button", { name: "Play as steakbutterfan", exact: true })
     .click();
@@ -607,10 +607,123 @@ test("steakbutterfan keeps chewing in town and fights", async ({ page }) => {
   await expect(fighter.locator(".burger-chew-face")).toHaveCSS("opacity", "0");
 });
 
+test("Zippy chews, Footjobofsteel spins his drill, and Sarina leaves a walking puff", async ({
+  page,
+}) => {
+  await page.goto("/mint");
+  const sprite = page.getByTestId("player-sprite");
+  const walking = sprite.locator(".paper-person.walking");
+  await (await picker(page))
+    .getByRole("button", { name: "Play as Zippy", exact: true })
+    .click();
+  const mouth = sprite.locator(".zippy-chew-mouth");
+  await expect(mouth).toHaveCSS("animation-name", "zippy-chew");
+  const [open, closed] = await mouth.evaluate((element) => {
+    const [chew] = element.getAnimations();
+    chew.pause();
+    chew.currentTime = 0;
+    const open = getComputedStyle(element).transform;
+    chew.currentTime = 240;
+    const closed = getComputedStyle(element).transform;
+    chew.play();
+    return [open, closed];
+  });
+  expect(closed).not.toBe(open);
+  await page.keyboard.down("d");
+  try {
+    await expect(walking).toBeVisible();
+    await expect(mouth).toHaveCSS("animation-play-state", "running");
+  } finally {
+    await page.keyboard.up("d");
+  }
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await expect(mouth).toHaveCSS("animation-name", "none");
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+
+  await (await picker(page))
+    .getByRole("button", { name: "Play as Footjobofsteel", exact: true })
+    .click();
+  const bit = sprite.locator(".drill-bit");
+  await expect(bit).toHaveCSS("animation-name", "drill-bit-turn");
+  await page.keyboard.down("d");
+  try {
+    await expect(walking).toBeVisible();
+    await expect(bit).toHaveCSS("animation-play-state", "running");
+  } finally {
+    await page.keyboard.up("d");
+  }
+
+  await (await picker(page))
+    .getByRole("button", { name: "Play as Sarina", exact: true })
+    .click();
+  const puff = sprite.locator(".sarina-walk-puff");
+  await expect(puff).toHaveCount(0);
+  await page.keyboard.down("a");
+  try {
+    await expect(puff).toHaveCSS("animation-name", "sarina-walk-puff");
+    await expect(puff.locator("xpath=../..")).toHaveAttribute(
+      "transform",
+      "translate(150 0) scale(-1 1)",
+    );
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await expect(puff).toHaveCSS("opacity", "0");
+  } finally {
+    await page.keyboard.up("a");
+  }
+  await expect(puff).toHaveCount(0);
+});
+
+test("Jat adjusts his glasses while idle and walking", async ({ page }) => {
+  await page.goto("/mint");
+  await (await picker(page))
+    .getByRole("button", { name: "Play as Jat", exact: true })
+    .click();
+  const sprite = page.getByTestId("player-sprite");
+  await expect(sprite.locator("image")).toHaveAttribute(
+    "href",
+    "/characters/jat-rig.png",
+  );
+  const glasses = sprite.locator(".jat-glasses");
+  const elbow = sprite.locator(".jat-upper-arm");
+  await expect(glasses).toHaveCSS("animation-name", "jat-glasses-slip");
+  const [rest, slipped, raised, restored] = await sprite.evaluate((element) => {
+    const glasses = element.querySelector(".jat-glasses")!;
+    const elbow = element.querySelector(".jat-upper-arm")!;
+    const animations = element.getAnimations({ subtree: true });
+    const seek = (time: number) => {
+      for (const animation of animations) animation.currentTime = time;
+    };
+    for (const animation of animations) animation.pause();
+    seek(0);
+    const rest = getComputedStyle(glasses).transform;
+    seek(2400);
+    const slipped = getComputedStyle(glasses).transform;
+    const raised = getComputedStyle(elbow).transform;
+    seek(2700);
+    const restored = getComputedStyle(glasses).transform;
+    for (const animation of animations) animation.play();
+    return [rest, slipped, raised, restored];
+  });
+  expect(slipped).not.toBe(rest);
+  expect(raised).not.toBe("none");
+  expect(restored).toBe(rest);
+  await page.keyboard.down("d");
+  try {
+    await expect(sprite.locator(".paper-person.walking")).toBeVisible();
+    await expect(glasses).toHaveCSS("animation-play-state", "running");
+    await expect(elbow).toHaveCSS("animation-play-state", "running");
+  } finally {
+    await page.keyboard.up("d");
+  }
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await expect(glasses).toHaveCSS("animation-name", "none");
+  await expect(elbow).toHaveCSS("animation-name", "none");
+});
+
 test("clicking a citizen, following movement, and restoring the save all work", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/mint");
   await startAsMint(page);
   await page
     .getByTestId("town")
@@ -663,7 +776,7 @@ test("clicking a citizen, following movement, and restoring the save all work", 
 test("pause settings control the TV treatment and camera without leaking input", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/mint");
   await startAsMint(page);
   await expect(page.locator(".play-screen")).toHaveAttribute(
     "data-tv-look",
@@ -709,7 +822,7 @@ test("workshop editing and a new playable character persist", async ({
   await page.addInitScript(() => {
     Object.assign(globalThis, { __MINT_ART__: {} });
   });
-  await page.goto("/");
+  await page.goto("/mint");
   await startAsMint(page);
   const choices = await picker(page);
   await choices
@@ -755,7 +868,7 @@ test("workshop editing and a new playable character persist", async ({
 test("native fullscreen keeps the game and pause menu usable", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/mint");
   await startAsMint(page);
   await page
     .getByRole("button", { name: "Fullscreen game", exact: true })
@@ -825,7 +938,7 @@ test("the standalone game needs no network after loading", async ({
 test("the town map routes the character to the school and neighborhood", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/mint");
   await startAsMint(page);
   const art = await page.locator(".scenery image").evaluateAll(async (images) =>
     Promise.all(
@@ -893,7 +1006,7 @@ test.describe("touch game", () => {
     page,
     request,
   }) => {
-    await page.goto("/");
+    await page.goto("/mint");
     await assertFullscreen(page);
     await page.getByLabel("Find a character").fill("kain");
     await page
@@ -935,7 +1048,7 @@ test.describe("touch game", () => {
   test("two-finger joystick and run input release cleanly", async ({
     page,
   }) => {
-    await page.goto("/");
+    await page.goto("/mint");
     await startAsMint(page);
     const cdp = await page.context().newCDPSession(page),
       sprite = page.getByTestId("player-sprite");

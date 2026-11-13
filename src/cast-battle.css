@@ -1,0 +1,265 @@
+.battle-fighter[data-motion="diarrhea-spray"] .duo-motion,
+.battle-fighter[data-motion="needle-toss"] .duo-motion,
+.battle-fighter[data-motion="fleshlight-volley"] .duo-motion {
+  animation: battle-pop var(--impact-duration) both;
+}
+
+.zippy-spray {
+  position: absolute;
+  left: calc(
+    var(--battle-player-x) + var(--direction) * var(--battle-sprite-size) * 0.17
+  );
+  bottom: calc(
+    (var(--source-ground) + var(--target-ground)) / 2 +
+      var(--battle-sprite-size) * 0.12
+  );
+  width: var(--crossing);
+  height: min(12cqw, calc(var(--battle-sprite-size) * 0.56));
+  transform: scaleX(var(--direction));
+}
+
+.zippy-spray span {
+  display: block;
+  width: 100%;
+  height: 100%;
+  animation: zippy-spray var(--impact-duration) linear both;
+}
+
+.zippy-spray img,
+.zippy-spray svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  color: #93532b;
+  object-fit: fill;
+  filter: drop-shadow(1px 2px 1px #25150b80);
+}
+
+@keyframes zippy-spray {
+  0%,
+  12% {
+    opacity: 0;
+    clip-path: inset(0 100% 0 0);
+  }
+  17% {
+    opacity: 1;
+  }
+  37%,
+  57% {
+    opacity: 1;
+    clip-path: inset(0);
+  }
+  72% {
+    opacity: 0.94;
+    clip-path: inset(0 0 0 67%);
+  }
+  100% {
+    opacity: 0;
+    clip-path: inset(0 0 0 78%);
+  }
+}
+
+.zippy-throw {
+  --travel: calc(var(--direction) * var(--crossing));
+  --launch: calc(var(--direction) * var(--battle-sprite-size) * 0.19);
+  --rise: calc(var(--throw-index) * 13px);
+  position: absolute;
+  left: var(--source-x);
+  bottom: calc(
+    (var(--source-ground) + var(--target-ground)) / 2 +
+      var(--battle-sprite-size) * 0.36
+  );
+  width: clamp(46px, calc(var(--battle-sprite-size) * 0.39), 118px);
+  transform: translateX(-50%);
+  animation: zippy-needle-flight calc(var(--impact-delay) + 315ms) linear
+    calc(var(--throw-index) * 80ms) both;
+}
+
+.zippy-throw > * {
+  display: block;
+  width: 100%;
+  transform: scaleX(var(--direction));
+  filter: drop-shadow(1px 2px 1px #1b161885);
+}
+
+.battle-field[data-visual="fleshlight-volley"] .zippy-throw {
+  width: clamp(48px, calc(var(--battle-sprite-size) * 0.41), 128px);
+  animation-name: zippy-sleeve-flight;
+  animation-delay: calc(var(--throw-index) * 105ms);
+}
+
+@keyframes zippy-needle-flight {
+  0%,
+  27% {
+    opacity: 0;
+    transform: translateX(calc(-50% + var(--launch)))
+      rotate(calc(var(--direction) * -16deg));
+  }
+  33%,
+  68% {
+    opacity: 1;
+  }
+  49% {
+    transform: translate(
+        calc(-50% + var(--travel) * 0.56),
+        calc(-17px - var(--rise))
+      )
+      rotate(calc(var(--direction) * 2deg));
+  }
+  68%,
+  77% {
+    transform: translate(calc(-50% + var(--travel)), calc(5px - var(--rise)))
+      rotate(calc(var(--direction) * 10deg));
+  }
+  100% {
+    opacity: 0;
+    transform: translate(calc(-50% + var(--travel)), calc(17px - var(--rise)))
+      rotate(calc(var(--direction) * 15deg));
+  }
+}
+
+@keyframes zippy-sleeve-flight {
+  0%,
+  24% {
+    opacity: 0;
+    transform: translateX(calc(-50% + var(--launch)))
+      rotate(calc(var(--direction) * -32deg));
+  }
+  33%,
+  76% {
+    opacity: 1;
+  }
+  48% {
+    transform: translate(
+        calc(-50% + var(--travel) * 0.55),
+        calc(-40px - var(--rise))
+      )
+      rotate(calc(var(--direction) * 155deg));
+  }
+  69% {
+    transform: translate(calc(-50% + var(--travel)), calc(3px - var(--rise)))
+      rotate(calc(var(--direction) * 370deg));
+  }
+  100% {
+    opacity: 0;
+    transform: translate(
+        calc(-50% + var(--travel) * 0.83),
+        calc(25px - var(--rise))
+      )
+      rotate(calc(var(--direction) * 470deg));
+  }
+}
+
+.battle-fighter[data-motion="drill-rush"] .duo-motion {
+  animation: nurse-drill-rush var(--impact-duration) both;
+}
+
+@keyframes nurse-drill-rush {
+  0%,
+  92%,
+  100% {
+    transform: none;
+  }
+  15%,
+  29% {
+    transform: translateX(calc(var(--facing) * -10px))
+      rotate(calc(var(--facing) * -8deg));
+  }
+  21%,
+  35% {
+    transform: translateX(calc(var(--facing) * -6px))
+      rotate(calc(var(--facing) * -5deg));
+  }
+  53%,
+  65% {
+    transform: translateX(calc(var(--facing) * (var(--lunge) + 10px)))
+      rotate(calc(var(--facing) * 9deg));
+  }
+  59%,
+  72% {
+    transform: translateX(calc(var(--facing) * var(--lunge)))
+      rotate(calc(var(--facing) * 5deg));
+  }
+}
+
+.nurse-drill-impact {
+  position: absolute;
+  left: calc(
+    var(--target-x) - var(--direction) * var(--battle-sprite-size) * 0.19
+  );
+  bottom: calc(var(--target-ground) + var(--battle-sprite-size) * 0.32);
+  width: clamp(32px, 8vmin, 90px);
+  height: auto;
+  color: #a85624;
+  fill: #ffdc73;
+  transform: translateX(-50%);
+  filter: drop-shadow(1px 2px #3d251a);
+  animation: battle-impact-art 450ms ease-out var(--impact-delay) both;
+}
+
+.nurse-first-aid {
+  position: absolute;
+  left: var(--source-x);
+  bottom: calc(var(--source-ground) + var(--battle-sprite-size) * 0.31);
+  display: grid;
+  place-items: center;
+  width: clamp(46px, 11vmin, 126px);
+  aspect-ratio: 1;
+  color: #d6ffe0;
+  transform: translateX(-50%);
+  filter: drop-shadow(1px 2px #1a5135);
+  animation: nurse-first-aid var(--impact-duration) ease-out both;
+}
+
+.nurse-first-aid svg:first-child {
+  width: 77%;
+  height: 77%;
+  fill: #4db879;
+}
+
+.nurse-first-aid svg:not(:first-child) {
+  position: absolute;
+  width: 31%;
+  height: 31%;
+  fill: #9decb1;
+}
+
+.nurse-first-aid svg:nth-child(2) {
+  top: 3%;
+  left: -13%;
+}
+
+.nurse-first-aid svg:nth-child(3) {
+  right: -13%;
+  bottom: 2%;
+}
+
+@keyframes nurse-first-aid {
+  0%,
+  23% {
+    opacity: 0;
+    transform: translate(-50%, 15px) scale(0.5);
+  }
+  46% {
+    opacity: 1;
+    transform: translate(-50%, -9px) scale(1.12);
+  }
+  62% {
+    opacity: 1;
+    transform: translate(-50%, -18px) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -45px) scale(0.88);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .zippy-throw {
+    left: var(--target-x);
+    transform: translate(
+      calc(-50% + var(--direction) * var(--throw-index) * 15px),
+      calc(var(--throw-index) * -13px)
+    );
+  }
+}

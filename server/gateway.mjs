@@ -1,4 +1,9 @@
-import { MAX_BODY, bridgeRequest, canonicalIp } from "./bridge.mjs";
+import {
+  MAX_BODY,
+  PRESENCE_BODY_LIMIT,
+  bridgeRequest,
+  canonicalIp,
+} from "./bridge.mjs";
 
 const gameId = "(?:mint|[0-9]{17,20})";
 const characterId = "[A-Za-z0-9_-]{1,80}";
@@ -7,7 +12,7 @@ const readRoute = new RegExp(
   `^/(?:health|drafts/${gameId}|games/${gameId}|games/${gameId}/characters/${characterId}/history|jobs/${uuid}|matches/${uuid}|assets/${uuid}\\.png)$`,
 );
 const writeRoute = new RegExp(
-  `^/(?:generations|games/${gameId}/characters/${characterId}/apply)$`,
+  `^/(?:generations|presence|games/${gameId}/characters/${characterId}/apply)$`,
 );
 
 export async function studioGateway(
@@ -45,11 +50,21 @@ export async function studioGateway(
       "The character studio is being connected. Please try again shortly.",
       503,
     );
+  const presence = path === "/presence";
+  const bodyLimit = presence ? PRESENCE_BODY_LIMIT : MAX_BODY;
+  const tooLarge = presence
+    ? "Player update is too large."
+    : "Upload a reference image smaller than 2 MB.";
   try {
     if (request.method === "POST") {
       const origin = request.headers.get("origin");
       if (origin && origin !== url.origin)
-        return json("Open this game directly to generate a character.", 403);
+        return json(
+          presence
+            ? "Open this game directly to play online."
+            : "Open this game directly to generate a character.",
+          403,
+        );
       if (!request.headers.get("content-type")?.startsWith("application/json"))
         return json("Send a JSON studio request.", 415);
     }
@@ -64,8 +79,8 @@ export async function studioGateway(
       request.headers.get("x-vercel-forwarded-for") ||
         request.headers.get("x-forwarded-for"),
     );
-    if (Number(request.headers.get("content-length")) > MAX_BODY)
-      return json("Upload a reference image smaller than 2 MB.", 413);
+    if (Number(request.headers.get("content-length")) > bodyLimit)
+      return json(tooLarge, 413);
     const chunks = [];
     let size = 0;
     if (request.body) {
@@ -75,9 +90,9 @@ export async function studioGateway(
           const item = await reader.read();
           if (item.done) break;
           size += item.value.byteLength;
-          if (size > MAX_BODY) {
+          if (size > bodyLimit) {
             await reader.cancel();
-            return json("Upload a reference image smaller than 2 MB.", 413);
+            return json(tooLarge, 413);
           }
           chunks.push(Buffer.from(item.value));
         }
@@ -93,6 +108,7 @@ export async function studioGateway(
       path,
       ip,
       body: Buffer.concat(chunks),
+      ...(presence ? { timeoutMs: 4000 } : {}),
     });
     return new Response(result.bytes, {
       status: result.status,

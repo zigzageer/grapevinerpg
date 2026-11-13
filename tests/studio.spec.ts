@@ -180,7 +180,7 @@ test("a visitor can add themselves from an uploaded reference, preview, and join
   page,
 }) => {
   const api = await studioApi(page);
-  await page.goto("/");
+  await page.goto("/mint");
   await openStudio(page);
   await expect(
     page.getByRole("textbox", { name: "Character name", exact: true }),
@@ -246,7 +246,7 @@ test("Miel can generate more than three edits and restore her original from hist
     .characters.find((c) => c.id === "friend-8")!;
   sharedMiel.preset = undefined;
   const roster = page.waitForResponse("**/api/studio/games/mint");
-  await page.goto("/");
+  await page.goto("/mint");
   await roster;
   await page.getByRole("button", { name: "Play as Mint", exact: true }).click();
   await page
@@ -322,7 +322,7 @@ test("an ability-only preview keeps the sprite and equips the move until history
   page,
 }) => {
   const api = await studioApi(page);
-  await page.goto("/");
+  await page.goto("/mint");
   await page.getByRole("button", { name: "Edit Mint", exact: true }).click();
   const studio = page.getByRole("dialog", { name: "Edit Mint", exact: true });
   const original = api.history.get("mint/you")!.versions[0];
