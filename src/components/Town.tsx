@@ -399,6 +399,7 @@ interface Props {
   ) => void;
   onTalk?: (conversation: ResidentConversation) => void;
   paused?: boolean;
+  showTownResidents?: boolean;
   townName?: string;
   serverTown?: ServerTown;
   remotePlayers?: Array<RemotePlayer & { character: Character }>;
@@ -462,6 +463,7 @@ export function Town({
   onSelectRemote,
   onTalk,
   paused = false,
+  showTownResidents = true,
   townName = TOWN_NAME,
   serverTown,
   remotePlayers = NO_REMOTE_PLAYERS,
@@ -490,12 +492,20 @@ export function Town({
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
   }, [hasLife, paused]);
-  const vehicles = useMemo(
-    () => (hasLife ? [...streetTraffic(life.time), ...winterParade(life.time)] : []),
-    [hasLife, life.time],
-  );
+  const vehicles = useMemo(() => {
+    if (!hasLife) return [];
+    const parade = winterParade(life.time);
+    return [
+      ...streetTraffic(life.time),
+      ...(showTownResidents
+        ? parade
+        : parade.filter(
+            ({ style }) => style !== "drummer" && style !== "flag-bearer",
+          )),
+    ];
+  }, [hasLife, life.time, showTownResidents]);
   const citizenSpots = useMemo(() => {
-    if (!serverTown) return CITIZEN_SPOTS;
+    if (!showTownResidents || !serverTown) return CITIZEN_SPOTS;
     const base = serverTown.characterSpawns;
     const spots = [...base];
     for (let index = base.length; index < crew.length; index++) {
@@ -504,7 +514,9 @@ export function Town({
       const separated = (candidate: Point) =>
         canStand(candidate, serverTown.walkArea) &&
         [serverTown.spawn, ...spots].every(
-          (p) => Math.abs(p.x - candidate.x) >= 100 || Math.abs(p.y - candidate.y) >= 30,
+          (p) =>
+            Math.abs(p.x - candidate.x) >= 100 ||
+            Math.abs(p.y - candidate.y) >= 30,
         );
       const extra = [
         { x: point.x - offset, y: point.y },
@@ -515,15 +527,13 @@ export function Town({
       spots.push(extra ?? point);
     }
     return spots;
-  }, [serverTown, crew.length]);
-  const occupied = useMemo(
-    () => {
-      const ids = new Set(occupiedCharacterIds);
-      for (const { characterId } of remotePlayers) ids.add(characterId);
-      return ids;
-    },
-    [occupiedCharacterIds, remotePlayers],
-  );
+  }, [showTownResidents, serverTown, crew.length]);
+  const occupied = useMemo(() => {
+    if (!showTownResidents) return;
+    const ids = new Set(occupiedCharacterIds);
+    for (const { characterId } of remotePlayers) ids.add(characterId);
+    return ids;
+  }, [showTownResidents, occupiedCharacterIds, remotePlayers]);
   const fighting = useMemo(
     () => new Set(fights.flatMap(({ fighters }) => fighters.map(characterKey))),
     [fights],
@@ -532,7 +542,11 @@ export function Town({
     ...crew.flatMap((c, i) => {
       const id = characterKey(c);
       const active = id === activeKey;
-      if (fighting.has(id) || (!active && occupied.has(id))) return [];
+      if (
+        fighting.has(id) ||
+        (!active && (!showTownResidents || occupied?.has(id)))
+      )
+        return [];
       return [
         {
           kind: "crew" as const,
@@ -557,7 +571,7 @@ export function Town({
         x: p.x,
         y: p.y,
       })),
-    ...(onTalk
+    ...(showTownResidents && onTalk
       ? life.residents.map((walker) => ({
           kind: "resident" as const,
           key: `resident-${walker.resident.id}`,
@@ -606,7 +620,11 @@ export function Town({
           <stop offset="1" stopColor="#253039" stopOpacity="0" />
         </radialGradient>
       </defs>
-      {serverTown ? <ServerTownScenery town={serverTown} /> : <Scenery townName={townName} />}
+      {serverTown ? (
+        <ServerTownScenery town={serverTown} />
+      ) : (
+        <Scenery townName={townName} />
+      )}
       {target && (
         <g
           className="walk-target"
@@ -714,7 +732,11 @@ export function Town({
             <g
               transform="translate(-36 -86.4) scale(.48)"
               data-testid={
-                remote ? "remote-player-sprite" : active ? "player-sprite" : undefined
+                remote
+                  ? "remote-player-sprite"
+                  : active
+                    ? "player-sprite"
+                    : undefined
               }
               data-character={e.id}
               data-session={remote?.sessionId}

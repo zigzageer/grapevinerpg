@@ -51,9 +51,9 @@ test("residents talk and roam while street traffic and the winter parade pass th
   page,
 }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
-  // The scene uses a paused clock; keep its cast selection independent of polling.
+  // Exercise the solo residents without advancing the presence polling clock.
   await page.addInitScript(() => {
-    Object.defineProperty(navigator, "onLine", { value: false });
+    Object.assign(globalThis, { __MINT_ART__: {} });
   });
   const start = new Date("2026-11-11T12:00:00Z");
   await page.clock.install({ time: start });

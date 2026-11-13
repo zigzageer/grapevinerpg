@@ -292,12 +292,19 @@ test("Grapevine's home and direct link share live players across browsers", asyn
       await expect(
         page.getByRole("dialog", { name: "Choose a clan member" }),
       ).toBeVisible();
+      await expect(page.getByTestId("player-sprite")).toHaveCount(0);
+      await expect(page.locator(".world-citizen")).toHaveCount(0);
+      await expect(
+        page.getByRole("button", { name: "Play as Sarina", exact: true }),
+      ).toBeVisible();
     }
     await home
       .getByRole("button", { name: "Play as Mint", exact: true })
       .click();
     const homeSprite = home.getByTestId("player-sprite");
     await expect(homeSprite).toHaveAttribute("data-character", "you");
+    await expect(home.getByTestId("remote-player-sprite")).toHaveCount(0);
+    await expect(home.locator(".world-citizen")).toHaveCount(0);
     const directMint = direct.getByRole("button", {
       name: "Play as Mint",
       exact: true,
@@ -341,10 +348,7 @@ test("Grapevine's home and direct link share live players across browsers", asyn
       "data-character",
       "you",
     );
-    const zippyCitizen = home.locator(
-      ".world-citizen [data-character='friend-9']",
-    );
-    await expect(zippyCitizen).toHaveCount(0);
+    await expect(home.locator(".world-citizen")).toHaveCount(0);
 
     await direct.keyboard.down("a");
     try {
@@ -375,10 +379,14 @@ test("Grapevine's home and direct link share live players across browsers", asyn
     await expect(peer).toHaveAttribute("data-session", peerSession);
     await expect(peer).toHaveAttribute("data-character", "friend-5");
     await expect(homeSprite).toHaveAttribute("data-character", "you");
-    await expect(zippyCitizen).toHaveCount(1);
+    await expect(home.locator(".world-citizen")).toHaveCount(0);
+    await expect(
+      home.getByRole("button", { name: "Interact with Zippy" }),
+    ).toHaveCount(0);
 
     online = false;
     await expect(peer).toHaveCount(0, { timeout: 8_000 });
+    await expect(home.locator(".world-citizen")).toHaveCount(0);
     await expect(homeSprite).toHaveAttribute("data-x", "850");
     online = true;
     await home.evaluate(() => window.dispatchEvent(new Event("online")));
@@ -405,7 +413,11 @@ test("Grapevine's home and direct link share live players across browsers", asyn
     await expect(direct.getByTestId("server-town-scenery")).toHaveCount(0);
     expect((await (await mintClaim).json()).accepted).toBe(true);
     await expect(peer).toHaveCount(0, { timeout: 16_000 });
+    await expect(home.locator(".world-citizen")).toHaveCount(0);
     await expect(direct.getByTestId("remote-player-sprite")).toHaveCount(0);
+    await expect(direct.locator(".world-citizen, [data-resident]")).toHaveCount(
+      0,
+    );
 
     const homeRelease = home.waitForResponse(
       (response) =>
@@ -534,6 +546,23 @@ test("clicking a live player starts an accepted fight visible to the town", asyn
     const [mint, zippy, spectator] = await Promise.all(
       contexts.map(async (context) => {
         const page = await context.newPage();
+        if (context !== contexts[0]) {
+          const x = context === contexts[1] ? 730 : 960;
+          await page.addInitScript(
+            ({ crew, x }) => {
+              localStorage.setItem(
+                "grapevine.clan.v1",
+                JSON.stringify({
+                  version: 1,
+                  castVersion: 12,
+                  player: { x, y: 590 },
+                  crew,
+                }),
+              );
+            },
+            { crew: DEFAULT_CREW, x },
+          );
+        }
         await page.goto("/grapevine");
         return page;
       }),
@@ -553,21 +582,10 @@ test("clicking a live player starts an accepted fight visible to the town", asyn
       exact: true,
     });
     await expect(opponent).toHaveAttribute("aria-description", "Online player");
-    // Fighters share a spawn. Moving apart also verifies that the click targets the avatar.
-    await zippy.keyboard.down("a");
-    try {
-      await expect
-        .poll(async () =>
-          Number(
-            await opponent
-              .getByTestId("remote-player-sprite")
-              .getAttribute("data-x"),
-          ),
-        )
-        .toBeLessThan(760);
-    } finally {
-      await zippy.keyboard.up("a");
-    }
+    await expect(opponent.getByTestId("remote-player-sprite")).toHaveAttribute(
+      "data-x",
+      "730",
+    );
     await opponent.click();
     await mint
       .getByRole("dialog", { name: "Zippy" })

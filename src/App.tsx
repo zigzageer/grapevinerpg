@@ -283,17 +283,19 @@ function Game({
       if (state.current.activeCharacter === id) rejectSavedCharacter(id);
     },
   );
+  const showTownResidents = !presenceWorldId || connection === "local";
+  const canPlayLocally = showTownResidents || connection === "offline";
   const active =
     savedCharacter &&
-    (!presenceWorldId ||
-      !publicRoster.has(savedCharacter.id) ||
-      claimedCharacterId === savedCharacter.id ||
-      connection === "offline")
+    (canPlayLocally || claimedCharacterId === savedCharacter.id)
       ? savedCharacter
       : undefined;
   const activeKey = active?.id ?? "";
   const panel = openPanel ?? (active ? null : "characters");
-  const townDuels = useMemo(() => readTownDuels(duelSnapshot), [duelSnapshot]);
+  const townDuels = useMemo(
+    () => readTownDuels(canPlayLocally ? undefined : duelSnapshot),
+    [canPlayLocally, duelSnapshot],
+  );
   const myDuel = townDuels.own;
   const onlineFighting = myDuel?.status === "fighting";
   const fights = useMemo(() => {
@@ -316,18 +318,18 @@ function Game({
     return markers;
   }, [townDuels.fights, publicRoster, localFighting, interaction]);
   const occupied = useMemo(
-    () => new Set(players.map((p) => p.characterId)),
-    [players],
+    () => new Set(canPlayLocally ? [] : players.map((p) => p.characterId)),
+    [canPlayLocally, players],
   );
   const remotePlayers = useMemo(
     () =>
-      players.flatMap((p) => {
+      (canPlayLocally ? [] : players).flatMap((p) => {
         const character = publicRoster.get(p.characterId);
         return character && canStand(p, town?.walkArea)
           ? [{ ...p, character }]
           : [];
       }),
-    [players, publicRoster, town?.walkArea],
+    [canPlayLocally, players, publicRoster, town?.walkArea],
   );
   walkArea.current = town?.walkArea;
   state.current = game;
@@ -349,6 +351,10 @@ function Game({
       setSelectionError(message);
       if (!restoring && panel !== "characters") notify(message);
     };
+    if (!canPlayLocally && !publicRoster.has(id)) {
+      showError("Publish this character in the studio to play online.");
+      return false;
+    }
     if (occupied.has(id)) {
       if (restoring) rejectSavedCharacter(id);
       else showError(`${c.name} is already playing in this town.`);
@@ -411,7 +417,9 @@ function Game({
       release();
   }, [claimedCharacterId, savedCharacter, publicRoster, release]);
   selectRef.current = (direction) => {
-    const crew = game.crew.filter((c) => !occupied.has(c.id));
+    const crew = game.crew.filter(
+      (c) => !occupied.has(c.id) && (canPlayLocally || publicRoster.has(c.id)),
+    );
     if (!crew.length) return;
     const i = crew.findIndex((c) => characterKey(c) === activeKey);
     void select(crew[(i + direction + crew.length) % crew.length]);
@@ -838,6 +846,7 @@ function Game({
               townName={townName}
               serverTown={town}
               paused={!!panel}
+              showTownResidents={showTownResidents}
               onTalk={
                 server || town
                   ? undefined
@@ -1046,16 +1055,21 @@ function Game({
             {filtered.map((c) => {
               const selected = c.id === activeKey;
               const taken = occupied.has(c.id);
+              const localOnly = !canPlayLocally && !publicRoster.has(c.id);
               return (
                 <div className="picker-card" key={c.id}>
                   <button
                     className={`picker-character ${selected ? "selected" : ""}`}
                     aria-label={`Play as ${c.name}`}
                     aria-description={
-                      taken ? "Already playing in this town" : undefined
+                      taken
+                        ? "Already playing in this town"
+                        : localOnly
+                          ? "Publish this character in the studio to play online"
+                          : undefined
                     }
                     aria-pressed={selected}
-                    disabled={taken || !!pendingCharacterId}
+                    disabled={taken || localOnly || !!pendingCharacterId}
                     onClick={() => void choose(c)}
                   >
                     <span className="picker-portrait">
@@ -1063,6 +1077,9 @@ function Game({
                     </span>
                     <strong>{c.name}</strong>
                     {taken && <span className="picker-occupied">In use</span>}
+                    {localOnly && (
+                      <span className="picker-occupied">Local only</span>
+                    )}
                     {selected && (
                       <span className="picker-check">
                         <Check size={14} />
@@ -1281,8 +1298,12 @@ function Game({
               <Compass size={21} />
               <span>
                 <strong>Mouse & touch</strong>Click or tap the ground to walk
-                there. Tap a cast member for actions
-                {server || town ? "." : ", or a resident to talk."}
+                there.{" "}
+                {showTownResidents
+                  ? server || town
+                    ? "Tap a cast member for actions."
+                    : "Tap a cast member for actions, or a resident to talk."
+                  : "Tap another player to challenge them."}
               </span>
             </p>
             <p>

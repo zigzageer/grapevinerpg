@@ -58,7 +58,7 @@ function readPlayers(input: unknown): RemotePlayer[] {
   });
 }
 
-type Connection = "connecting" | "online" | "offline" | "unavailable";
+type Connection = "connecting" | "online" | "offline" | "local" | "unavailable";
 type ClaimResult = "accepted" | "taken" | "offline" | "unavailable";
 type PresenceUpdate =
   | { action: "watch" | "release" }
@@ -180,12 +180,13 @@ export function useTownPresence(
         if (disposed || epoch !== pageEpoch) return;
         const watching = "action" in update && update.action === "watch";
         const missingEndpoint =
-          unavailableEndpoint(error) && (watching || status === "offline");
+          unavailableEndpoint(error) && (watching || status === "local");
         updateConnection(
-          !navigator.onLine ||
-            (!hasConnected && (import.meta.env.DEV || missingEndpoint))
+          !navigator.onLine
             ? "offline"
-            : "unavailable",
+            : !hasConnected && (import.meta.env.DEV || missingEndpoint)
+              ? "local"
+              : "unavailable",
         );
         retryAt = performance.now() + retryDelay;
         retryDelay = Math.min(retryDelay * 2, 8_000);
@@ -312,7 +313,10 @@ export function useTownPresence(
           setClaim(characterId);
         }
         schedule(IDLE_INTERVAL);
-        if (!snapshot) return status === "offline" ? "offline" : "unavailable";
+        if (!snapshot)
+          return status === "offline" || status === "local"
+            ? "offline"
+            : "unavailable";
         if (snapshot.accepted) return "accepted";
         return snapshot.reason === "taken" ? "taken" : "unavailable";
       },
