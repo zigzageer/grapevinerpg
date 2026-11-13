@@ -1,4 +1,5 @@
-import { Swords, Trophy } from "lucide-react";
+import { Trophy } from "lucide-react";
+import { uiArtUrl } from "../game/art";
 import type { Character } from "../game/model";
 import type { MyTownDuel, TownDuelAction } from "../game/town-duels";
 import "../town-duel-notice.css";
@@ -30,7 +31,16 @@ export function TownDuelNotice({
   return (
     <section className="town-duel-notice" aria-label="Online fight">
       <div className="town-duel-heading" role="status">
-        {finished ? <Trophy size={18} /> : <Swords size={18} />}
+        {finished ? (
+          <Trophy size={21} aria-hidden="true" />
+        ) : (
+          <img
+            className="ui-sticker"
+            src={uiArtUrl("impact")}
+            alt=""
+            draggable={false}
+          />
+        )}
         <strong>{title}</strong>
       </div>
       {offered && (

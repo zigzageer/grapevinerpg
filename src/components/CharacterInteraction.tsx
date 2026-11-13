@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { Heart, Play, Swords } from "lucide-react";
-import { sceneryArtUrl } from "../game/art";
+import { Heart, Play } from "lucide-react";
+import { sceneryArtUrl, uiArtUrl } from "../game/art";
 import { characterScale, type Character } from "../game/model";
 import { Battle } from "./Battle";
 import { CharacterArt } from "./Character";
@@ -112,11 +112,12 @@ export function CharacterInteraction({
       {mode === "menu" ? (
         <div className="interaction-actions">
           <button
-            className="button primary"
+            className="button primary interaction-fight"
             disabled={challengePending}
             onClick={onChallenge ?? (() => setMode("fight"))}
           >
-            <Swords size={20} /> {challengePending ? "Sending…" : "Fight"}
+            <img src={uiArtUrl("impact")} alt="" />
+            {challengePending ? "Sending…" : "Fight"}
           </button>
           {!onChallenge && (
             <>

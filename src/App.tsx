@@ -42,6 +42,7 @@ import {
 } from "./game/model";
 import { DEFAULT_ZOOM, MIN_ZOOM, MAX_ZOOM, followCamera } from "./game/camera";
 import { findPath } from "./game/navigation";
+import { uiArtUrl } from "./game/art";
 import { Town, type TownFight } from "./components/Town";
 import { ResidentDialogue } from "./components/TownLife";
 import type { ResidentConversation } from "./game/town-life";
@@ -922,7 +923,12 @@ function Game({
                 aria-label="Town map"
                 onClick={() => open("map")}
               >
-                <MapIcon size={21} />
+                <img
+                  className="ui-sticker"
+                  src={uiArtUrl("map")}
+                  alt=""
+                  draggable={false}
+                />
               </button>
               {canFullscreen && (
                 <button
@@ -985,7 +991,12 @@ function Game({
             aria-label="Choose characters"
             onClick={() => open("characters")}
           >
-            <Users size={21} />
+            <img
+              className="ui-sticker"
+              src={uiArtUrl("hankey")}
+              alt=""
+              draggable={false}
+            />
             <span>Characters</span>
             <kbd>C</kbd>
           </button>

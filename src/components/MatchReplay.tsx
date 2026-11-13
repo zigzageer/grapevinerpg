@@ -9,6 +9,7 @@ import {
   Trophy,
   Users,
 } from "lucide-react";
+import { uiArtUrl } from "../game/art";
 import type { MatchEvent, MatchFighter, MatchSnapshot } from "../game/matches";
 import { studioRequest } from "../game/studio";
 import "./match-replay.css";
@@ -220,18 +221,29 @@ export function MatchReplay({ id }: { id: string }) {
       <a className="replay-back" href="/grapevine">
         <ArrowLeft size={17} /> Grapevine
       </a>
-      <header className="replay-heading">
-        <div>
+      <header className="replay-heading" data-match-status={match.status}>
+        <div className="replay-heading-copy">
           <p>{matchLabel}</p>
           <h1>
-            {sideTitle(0)} <span>vs</span> {sideTitle(1)}
+            {sideTitle(0)} <span className="replay-versus">vs</span>{" "}
+            {sideTitle(1)}
           </h1>
         </div>
         <span className="replay-status">
           <Swords size={15} /> {status}
         </span>
+        <img
+          className="replay-impact"
+          src={uiArtUrl("impact")}
+          alt=""
+          draggable={false}
+        />
       </header>
-      <section className="replay-summary" aria-live="polite">
+      <section
+        className="replay-summary"
+        data-result={winner ? "winner" : match.status}
+        aria-live="polite"
+      >
         {winner ? (
           <>
             <Trophy size={23} />
@@ -241,7 +253,7 @@ export function MatchReplay({ id }: { id: string }) {
           <>
             <Clock size={22} />
             <strong>{timerLabel}</strong>
-            <span>
+            <span className="replay-signup-note">
               Join in Discord. {match.minPlayersPerSide} needed per side.
             </span>
           </>

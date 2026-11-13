@@ -51,7 +51,7 @@ import {
   Zap,
   type LucideIcon,
 } from "lucide-react";
-import { abilityArtUrl, sceneryArtUrl } from "../game/art";
+import { abilityArtUrl, sceneryArtUrl, uiArtUrl } from "../game/art";
 import {
   battleReducer,
   createBattle,
@@ -211,23 +211,29 @@ function FighterStatus({
   fighter,
   character,
   side,
+  active,
   guarding = false,
   previousHealth,
 }: {
   fighter: Fighter;
   character: Character;
   side: Side;
+  active: boolean;
   guarding?: boolean;
   previousHealth?: number;
 }) {
   const scale = characterScale(character);
   return (
-    <section className={`fighter-status ${side}`} aria-label={fighter.name}>
+    <section
+      className={`fighter-status ${side}`}
+      aria-label={fighter.name}
+      data-active={active || undefined}
+    >
       <div className="battle-portrait" aria-hidden="true">
         <svg
           viewBox={`${75 - 62 * scale} ${180 - 182 * scale} ${124 * scale} ${124 * scale}`}
         >
-          <CharacterArt c={character} />
+          <CharacterArt c={character} portrait />
         </svg>
       </div>
       <div className="battle-vitals">
@@ -240,34 +246,34 @@ function FighterStatus({
           previous={previousHealth}
         />
         <BattleMeter fighter={fighter} kind="power" />
-        <div className="fighter-effects">
-          <span
-            title={`Armor ${fighter.armor}`}
-            aria-label={`Armor ${fighter.armor}`}
-          >
-            <Shield size={12} /> {fighter.armor}
+      </div>
+      <div className="fighter-effects">
+        <span
+          title={`Armor ${fighter.armor}`}
+          aria-label={`Armor ${fighter.armor}`}
+        >
+          <Shield size={12} /> {fighter.armor}
+        </span>
+        {fighter.burning > 0 && (
+          <span>
+            <Flame size={12} /> Burning {fighter.burning}
           </span>
-          {fighter.burning > 0 && (
-            <span>
-              <Flame size={12} /> Burning {fighter.burning}
-            </span>
-          )}
-          {fighter.stunned && (
-            <span>
-              <Zap size={12} /> Stunned
-            </span>
-          )}
-          {fighter.asleep && (
-            <span>
-              <Moon size={12} /> Asleep
-            </span>
-          )}
-          {guarding && (
-            <span>
-              <Shield size={12} /> Braced
-            </span>
-          )}
-        </div>
+        )}
+        {fighter.stunned && (
+          <span>
+            <Zap size={12} /> Stunned
+          </span>
+        )}
+        {fighter.asleep && (
+          <span>
+            <Moon size={12} /> Asleep
+          </span>
+        )}
+        {guarding && (
+          <span>
+            <Shield size={12} /> Braced
+          </span>
+        )}
       </div>
     </section>
   );
@@ -511,16 +517,12 @@ function Battlefield({
   crew,
   battle,
   event,
+  actingSide,
 }: Pick<Props, "actor" | "other" | "crew"> & {
   battle: BattleState;
   event: BattleEvent | null;
+  actingSide: Side | undefined;
 }) {
-  const turn =
-    battle.phase === "block"
-      ? "opponent"
-      : battle.phase === "choose" || battle.phase === "attack"
-        ? "player"
-        : undefined;
   return (
     <div
       className="duo-stage battle-field"
@@ -555,7 +557,7 @@ function Battlefield({
             <div
               key={side}
               className={`duo-fighter battle-fighter ${side}`}
-              data-turn={turn === side || undefined}
+              data-turn={actingSide === side || undefined}
               data-motion={motion}
               data-ko={
                 (side === "player" && battle.phase === "defeat") ||
@@ -763,9 +765,9 @@ function BattleCommands({
   return (
     <div className="battle-command-area">
       <div className="battle-command-hint" aria-hidden="true">
-        <b className="battle-grid-detail">Your turn</b>
-        <b className="battle-wheel-detail">
-          {focused.name} <small>{focused.detail}</small>
+        <b>
+          {focused.name}
+          {focused.detail && <small>{focused.detail}</small>}
         </b>
         <span>{focused.description}</span>
       </div>
@@ -938,6 +940,14 @@ export function Battle({ actor, other, crew, onBack, onClose }: Props) {
   const finished = battle.phase === "victory" || battle.phase === "defeat";
   const defending = battle.phase === "block";
   const timing = battle.phase === "attack" || defending;
+  const actingSide =
+    battle.phase === "choose" || battle.phase === "attack"
+      ? "player"
+      : defending
+        ? "opponent"
+        : battle.phase === "impact"
+          ? battle.event?.actor
+          : undefined;
   const lingeringEvent =
     battle.event &&
     ["snack", "burn", "stun", "sleep"].includes(battle.event.move);
@@ -1016,12 +1026,14 @@ export function Battle({ actor, other, crew, onBack, onClose }: Props) {
         crew={crew}
         battle={battle}
         event={activeEvent}
+        actingSide={actingSide}
       />
       <div className="battle-statuses">
         <FighterStatus
           fighter={battle.player}
           character={actor}
           side="player"
+          active={actingSide === "player"}
           guarding={battle.guarding}
           previousHealth={
             struck === "player" ? battle.player.hp + damage : undefined
@@ -1031,6 +1043,7 @@ export function Battle({ actor, other, crew, onBack, onClose }: Props) {
           fighter={battle.opponent}
           character={other}
           side="opponent"
+          active={actingSide === "opponent"}
           previousHealth={
             struck === "opponent" ? battle.opponent.hp + damage : undefined
           }
@@ -1073,7 +1086,14 @@ export function Battle({ actor, other, crew, onBack, onClose }: Props) {
       )}
       {finished && (
         <div className="battle-result">
-          <strong aria-hidden="true">{result}</strong>
+          <strong aria-hidden="true">
+            <img
+              className="battle-result-art"
+              src={uiArtUrl("impact")}
+              alt=""
+            />
+            {result}
+          </strong>
           <div>
             <button ref={returnButton} onClick={onClose}>
               Back to town

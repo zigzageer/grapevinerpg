@@ -16,3 +16,9 @@ export function abilityArtUrl(name: string): string {
     .__MINT_ABILITIES__;
   return embedded?.[name] || `/abilities/${name}.webp`;
 }
+
+export function uiArtUrl(name: "hankey" | "impact" | "map"): string {
+  const embedded = (globalThis as { __MINT_UI__?: Record<string, string> })
+    .__MINT_UI__;
+  return embedded?.[name] || `/ui/${name}.webp`;
+}

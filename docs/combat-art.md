@@ -155,3 +155,31 @@ Create a single game effect cutout containing two adult men kneeling side by sid
 ```text
 Draw one whole side-view cutout of a bright cherry-red late-model Corvette-style open-top sports car pointing to the viewer’s right, with its driver Chaz visible in the cockpit. Game summon sprite for Adventures of Mint. Distinctively low wedge nose and Corvette proportions, open roof, two visible simple black wheels, cream windshield reflection, no text or badges. Chaz is a handsome adult male, meme-inspired Chad with strong square jaw and cheekbones, but a feminine styling with long flowing dark hair, visibly full rosy lips, winged eyeliner, and a small black choker. His head and upper shoulders project clearly above the car door so his face is readable, one hand at the steering wheel, passenger seat empty. Render both car and driver in classic South Park TV flat paper cutout style, oversized almost circular head with close white oval eyes, construction-paper matte colors, flat clean silhouette and bold shape breaks, no photoreal reflections. All of the bumper, wheels, and hair fully inside the canvas. Genuine transparent alpha around the single car and its driver, no road, smoke, speed lines, drop shadow, text, extra people, logo or background.
 ```
+
+## Town interface
+
+These ImageGen cutouts and textures are cropped and encoded as WebP for the town HUD, menus, and battles.
+
+**Mr. Hankey** — `public/ui/hankey.webp`
+
+```text
+Use case: stylized-concept. Create one tiny HUD sticker sprite of Mr. Hankey from classic South Park, for the Characters button of a paper-cutout multiplayer town RPG. The recognizable friendly brown curled Christmas poo mascot wearing a red Santa hat with warm off-white trim and pom, round white eyes, simple smile and white mitten gloves, one mitten waving. Small complete bust/full cutout in a tight almost square silhouette, large face and hat so readable at 32–48px. Authentically flat two-dimensional late-1990s TV construction paper, bold cut edges and very fine paper grain, clean single dark outline and sparse color blocks. Use burgundy-red and warm parchment, deep cocoa silhouette. One isolated icon with full real transparency and comfortable margin, no badge, no backdrop, no floor, no lettering, no shadow haze, no border around the canvas.
+```
+
+**Town map** — `public/ui/map.webp`
+
+```text
+Use case: stylized-concept. One isolated tiny cut-paper game UI sticker of an unfurled town map with three fat irregular parchment folds, boldly inked winding plum road, muted pine green corner, and a single dark red pin drawn as a simple cutout. Thick slightly irregular ink contour, warm pale butter paper, just a few high-contrast shapes so it reads at 30 px. Authentic flat handmade construction-paper style of a classic South Park RPG. Single complete map icon centered on true alpha, no text or numbers, no surrounding plaque, no perspective shadows, no gradient and no white background.
+```
+
+**Fight impact** — `public/ui/impact.webp`
+
+```text
+Use case: stylized-concept. One isolated readable cut-paper icon of a classic cartoon combat impact star, a large irregular marigold-yellow jagged starburst with short burnt-orange secondary layer and a crisp deep plum outline. Two small pale-gold paper flecks around it and two stubby dark orange motion lines, high contrast, compact and recognizable at 28 px. Authentic flat paper edges and muted grain like a South Park RPG pause-menu sticker. True transparent alpha all around, no glow, no smooth gradient, no scenery, no lettering, no damage or body parts. Center in a roughly square canvas with clear margins.
+```
+
+**Construction paper** — `public/ui/paper.webp`
+
+```text
+Use case: stylized-concept. Generate one tileable dark tinted construction-paper texture swatch for a South Park cutout RPG interface. One uninterrupted full-bleed near-black charcoal-purple matte paper surface, barely visible tight pressed paper fibers with tiny scattered flecks and subtle grain. Color target from #252330 to #2e2937. Uniform, quiet and flat under light cream text, with no shadows, gradients, folds, creases, lighting, seams, text, edges, icons or objects. Matte and low contrast. Square texture designed to repeat seamlessly. Entire canvas is the same material. No transparent regions.
+```

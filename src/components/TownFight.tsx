@@ -1,4 +1,5 @@
 import { memo } from "react";
+import { uiArtUrl } from "../game/art";
 import type { Character, Point } from "../game/model";
 import { CharacterArt } from "./Character";
 import "../town-fight.css";
@@ -47,13 +48,13 @@ export const TownFightMarker = memo(function TownFightMarker({
             fill="#e8cde3"
           />
         </g>
-        <path
+        <image
           className="town-fight-flash"
-          d="m3-69 10 19 22-4-12 17 13 16-23-4-12 18-7-20-22 3 12-16-12-17 22 6Z"
-          fill="#ffce65"
-          stroke="#9b4e48"
-          strokeWidth="2.4"
-          strokeLinejoin="round"
+          href={uiArtUrl("impact")}
+          x="-36"
+          y="-72"
+          width="73"
+          height="68"
         />
         <g
           className="town-fight-puffs"

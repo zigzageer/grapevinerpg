@@ -9,6 +9,8 @@ import "@fontsource/fredoka/600.css";
 import App from "./App";
 import "./styles.css";
 import "./game-screen.css";
+import "./town-menu.css";
+import "./town-ui.css";
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <App />
