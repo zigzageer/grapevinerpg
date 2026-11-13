@@ -342,7 +342,7 @@ test("the game fills the screen immediately and every character can be played", 
     await expect(page.locator(".active-citizen .nameplate")).toHaveText(name);
     if (["David", "Ghost", "Grace", "Milka", "Semi", "Tommy"].includes(name)) {
       await expect(
-        page.getByTestId("player-sprite").locator("image"),
+        page.getByTestId("player-sprite").locator("image").first(),
       ).toHaveAttribute("href", `/characters/${name.toLowerCase()}.png`);
     }
     const x = Number(
@@ -605,6 +605,52 @@ test("steakbutterfan keeps chewing in town and fights", async ({ page }) => {
     "none",
   );
   await expect(fighter.locator(".burger-chew-face")).toHaveCSS("opacity", "0");
+});
+
+test("Semi takes bites and chews in town and in a duel", async ({ page }) => {
+  await page.goto("/mint");
+  await (await picker(page))
+    .getByRole("button", { name: "Play as Semi", exact: true })
+    .click();
+  const sprite = page.getByTestId("player-sprite");
+  const chew = sprite.locator(".semi-chew-pose");
+  await expect(chew.locator("image")).toHaveAttribute(
+    "href",
+    "/characters/semi-chew.png",
+  );
+  const poses = await chew.evaluate((element) => {
+    const [pose] = element.getAnimations();
+    pose.pause();
+    pose.currentTime = 0;
+    const before = getComputedStyle(element).visibility;
+    pose.currentTime = 850;
+    const after = getComputedStyle(element).visibility;
+    pose.play();
+    return [before, after];
+  });
+  expect(poses).toEqual(["hidden", "visible"]);
+  await pause(page);
+  await expect(sprite.locator(".semi-chew-mouth")).toHaveCSS(
+    "animation-play-state",
+    "paused",
+  );
+  await page.keyboard.press("Escape");
+
+  await page
+    .getByRole("button", { name: "Interact with Sarina", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Fight", exact: true }).click();
+  const fighter = page.getByTestId("battle").locator(".duo-fighter.player");
+  await expect(fighter.locator(".semi-chew-mouth")).toHaveCSS(
+    "animation-iteration-count",
+    "infinite",
+  );
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await expect(fighter.locator(".semi-chew-pose")).toHaveCSS(
+    "visibility",
+    "hidden",
+  );
+  await expect(fighter.locator(".semi-bite-pose")).toHaveCSS("opacity", "1");
 });
 
 test("Zippy chews, Footjobofsteel spins his drill, and Sarina leaves a walking puff", async ({

@@ -95,6 +95,35 @@ function ZippyChew({ sprite, clipId }: { sprite: string; clipId: string }) {
   );
 }
 
+function SemiChew({ id }: { id: string }) {
+  const spriteId = `semi-chew-sprite-${id}`;
+  const clipId = `semi-chew-mouth-${id}`;
+  return (
+    <g aria-hidden="true">
+      <g className="semi-chew-pose">
+        <defs>
+          <clipPath id={clipId}>
+            <ellipse cx="75.1" cy="94.2" rx="9.4" ry="5.3" />
+          </clipPath>
+        </defs>
+        <image
+          id={spriteId}
+          href={characterArtUrl("semi-chew")}
+          width="150"
+          height="180"
+          preserveAspectRatio="xMidYMax meet"
+        />
+        <g clipPath={`url(#${clipId})`}>
+          <use className="semi-chew-mouth" href={`#${spriteId}`} />
+        </g>
+      </g>
+      <g className="semi-bite-crumbs" fill="#d88c27">
+        <path d="m73 98 1.2-.5.5 1.1-1.3.5zm-2.5 1.3 1-.3.5 1.3-1.2.3zm4.7 1.1.9.2-.2 1.1-1-.2z" />
+      </g>
+    </g>
+  );
+}
+
 function DrillBit() {
   return (
     <g transform="translate(33.7 104.5) rotate(14)" aria-hidden="true">
@@ -235,12 +264,14 @@ function CharacterCutout({
     const rolling = moving && !c.sprite && c.preset === "kawaiikitty";
     const eating = !c.sprite && c.preset === "steakbutterfan";
     const chewing = !c.sprite && c.preset === "zippy";
+    const munching = !c.sprite && c.preset === "semi" && !portrait;
     const adjustingGlasses = !c.sprite && c.preset === "jat" && !portrait;
     const spriteId = `zippy-sprite-${id}`;
     const motion = rolling ? " chair-rolling" : moving ? " walking" : "";
     const image = (
       <image
         id={chewing ? spriteId : undefined}
+        className={munching ? "semi-bite-pose" : undefined}
         href={adjustingGlasses ? characterArtUrl("jat-rig") : sprite}
         x="0"
         y={c.preset === "zippy" ? 30 : 0}
@@ -265,6 +296,7 @@ function CharacterCutout({
         {chewing && (
           <ZippyChew sprite={spriteId} clipId={`zippy-mouth-${id}`} />
         )}
+        {munching && <SemiChew id={id} />}
         {!c.sprite && c.preset === "footjobofsteel" && <DrillBit />}
         {adjustingGlasses && <JatGlasses />}
         {!c.sprite && c.preset === "orrow" && <OrrowMouth />}

@@ -796,6 +796,65 @@ button:active:not(:disabled) {
     transform: translateY(0.2px) scaleY(0.88);
   }
 }
+.semi-bite-pose {
+  animation: semi-bite-pose 2.5s step-end infinite;
+}
+.semi-chew-pose {
+  visibility: hidden;
+  animation: semi-chew-pose 2.5s step-end infinite;
+}
+.semi-chew-mouth {
+  transform-origin: 75.1px 94.2px;
+  animation: semi-chew-mouth 2.5s ease-in-out infinite;
+}
+.semi-bite-crumbs {
+  opacity: 0;
+  animation: semi-bite-crumbs 2.5s ease-out infinite;
+}
+@keyframes semi-bite-pose {
+  24% {
+    opacity: 0;
+  }
+  86% {
+    opacity: 1;
+  }
+}
+@keyframes semi-chew-pose {
+  24% {
+    visibility: visible;
+  }
+  86% {
+    visibility: hidden;
+  }
+}
+@keyframes semi-chew-mouth {
+  24%,
+  44%,
+  64%,
+  84% {
+    transform: none;
+  }
+  34%,
+  54%,
+  74% {
+    transform: translateY(0.8px) scale(0.92, 0.72);
+  }
+}
+@keyframes semi-bite-crumbs {
+  0%,
+  20% {
+    opacity: 0;
+    transform: none;
+  }
+  24% {
+    opacity: 1;
+  }
+  44%,
+  100% {
+    opacity: 0;
+    transform: translate(-11px, 13px) rotate(-5deg);
+  }
+}
 .drill-bit {
   transform-origin: 0 0;
   animation: drill-bit-turn 0.27s linear infinite;
@@ -835,6 +894,10 @@ button:active:not(:disabled) {
 .town-svg[data-paused="true"]
   :is(
     .zippy-chew-mouth,
+    .semi-bite-pose,
+    .semi-chew-pose,
+    .semi-chew-mouth,
+    .semi-bite-crumbs,
     .drill-bit,
     .sarina-walk-puff,
     .jat-glasses,
