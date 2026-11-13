@@ -1,12 +1,12 @@
-import { useEffect, useEffectEvent, useRef, useState } from "react";
 import {
-  canStand,
-  normalizeCharacter,
-  type Character,
-  type Point,
-  type WalkArea,
-} from "./model";
-import { studioRequest } from "./studio";
+  useCallback,
+  useEffect,
+  useEffectEvent,
+  useRef,
+  useState,
+} from "react";
+import { normalizeCharacter, type Character, type Point } from "./model";
+import { StudioRequestError, studioRequest } from "./studio";
 
 export type PlayerPose = Point & { facing: -1 | 1; moving: boolean };
 export type RemotePlayer = PlayerPose & {
@@ -31,9 +31,9 @@ export function publicMintRoster(characters: Character[]): Character[] {
     });
 }
 
-function readPlayers(input: unknown, area?: WalkArea): RemotePlayer[] {
+function readPlayers(input: unknown): RemotePlayer[] {
   const list = (input as { players?: unknown } | null)?.players;
-  if (!Array.isArray(list) || list.length > 63)
+  if (!Array.isArray(list) || list.length > 64)
     throw new Error("Invalid town presence snapshot.");
   const seen = new Set<string>();
   return list.filter((entry): entry is RemotePlayer => {
@@ -50,8 +50,7 @@ function readPlayers(input: unknown, area?: WalkArea): RemotePlayer[] {
       !Number.isFinite(p.x) ||
       !Number.isFinite(p.y) ||
       (p.facing !== -1 && p.facing !== 1) ||
-      typeof p.moving !== "boolean" ||
-      !canStand({ x: p.x, y: p.y }, area)
+      typeof p.moving !== "boolean"
     )
       return false;
     seen.add(p.sessionId);
@@ -59,122 +58,334 @@ function readPlayers(input: unknown, area?: WalkArea): RemotePlayer[] {
   });
 }
 
+type Connection = "connecting" | "online" | "offline" | "unavailable";
+type ClaimResult = "accepted" | "taken" | "offline" | "unavailable";
+type PresenceUpdate =
+  | { action: "watch" | "release" }
+  | (PlayerPose & { characterId: string });
+type PresenceSnapshot = {
+  accepted: boolean;
+  reason?: "taken" | "stale";
+  players: RemotePlayer[];
+  duels?: unknown;
+};
+type TownSession = {
+  claim: (characterId: string) => Promise<ClaimResult>;
+  release: () => void;
+  wake: () => void;
+  applyDuels: (snapshot: unknown) => void;
+  credentials: () =>
+    | {
+        worldId: string;
+        sessionToken: string;
+        characterId: string;
+      }
+    | undefined;
+};
+
+function unavailableEndpoint(error: unknown) {
+  return (
+    error instanceof StudioRequestError && [404, 405].includes(error.status)
+  );
+}
+
 export function useTownPresence(
   worldId: string | undefined,
-  characterId: string | undefined,
   pose: PlayerPose,
   paused: boolean,
-  walkArea?: WalkArea,
-): RemotePlayer[] {
-  const enabled = Boolean(
-    worldId && characterId && globalThis.crypto?.randomUUID,
-  );
-  const session = useRef<string>(undefined);
-  const sequence = useRef(0);
-  const wake = useRef<() => void>(undefined);
+  onClaimLost: (characterId: string) => void,
+) {
+  const session = useRef<TownSession>(undefined);
+  const [claimedCharacterId, setClaim] = useState<string>();
   const [players, setPlayers] = useState(NO_PLAYERS);
-  const latest = useEffectEvent(() => ({
-    characterId,
-    pose,
-    paused,
-    walkArea,
-  }));
+  const [duelSnapshot, setDuelSnapshot] = useState<unknown>();
+  const [connection, setConnection] = useState<Connection>("connecting");
+  const latest = useEffectEvent(() => ({ pose, paused }));
+  const loseClaim = useEffectEvent(onClaimLost);
 
   useEffect(() => {
+    setClaim(undefined);
     setPlayers(NO_PLAYERS);
-    if (!enabled || !worldId) return;
-    const sessionToken = (session.current ??= crypto.randomUUID());
+    setDuelSnapshot(undefined);
+    if (!worldId || !globalThis.crypto?.randomUUID) {
+      setConnection("offline");
+      return;
+    }
+
+    const sessionToken = crypto.randomUUID();
+    let seq = 0;
+    let claimedId: string | undefined;
+    let disposed = false;
+    let leaving = false;
+    let claiming = false;
+    let hasConnected = false;
+    let needsRelease = false;
+    let pageEpoch = 0;
+    let duelRevision = 0;
+    let status: Connection = navigator.onLine ? "connecting" : "offline";
+    setConnection(status);
+    let request: AbortController | undefined;
+    let queue: Promise<unknown> = Promise.resolve();
     let timer: ReturnType<typeof setTimeout>;
     let staleTimer: ReturnType<typeof setTimeout>;
-    let pending: AbortController | undefined;
-    let disposed = false;
-    let lastStart = -Infinity;
-    let retryAt = 0;
     let retryDelay = 1_000;
-    let hasPeers = false;
+    let retryAt = 0;
+    let lastPoll = -Infinity;
 
-    const schedule = (delay: number) => {
-      const now = performance.now();
-      clearTimeout(timer);
-      timer = setTimeout(
-        poll,
-        Math.max(delay, retryAt - now, lastStart + ACTIVE_INTERVAL - now),
-      );
-    };
-    const nudge = () => {
-      if (!pending) schedule(0);
-    };
-    const reconnect = () => {
-      retryAt = 0;
-      retryDelay = 1_000;
-      nudge();
+    const updateConnection = (next: Connection) => {
+      status = next;
+      setConnection(next);
     };
     const clearPeers = () => {
-      hasPeers = false;
       setPlayers(NO_PLAYERS);
+      setDuelSnapshot(undefined);
     };
-    const poll = async () => {
-      const current = latest();
-      if (disposed || pending || !current.characterId) return;
-      lastStart = performance.now();
+    const enqueue = <T>(task: () => Promise<T>): Promise<T> => {
+      const result = queue.then(task);
+      queue = result.catch(() => undefined);
+      return result;
+    };
+    const send = async (
+      update: PresenceUpdate,
+    ): Promise<PresenceSnapshot | undefined> => {
+      if (disposed || leaving) return;
+      const epoch = pageEpoch;
+      const revision = duelRevision;
+      if ("characterId" in update) needsRelease = true;
       const controller = new AbortController();
-      pending = controller;
+      request = controller;
       const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
       try {
-        const snapshot = await studioRequest<unknown>(
+        const raw = await studioRequest<PresenceSnapshot>(
           "/presence",
-          {
-            worldId,
-            sessionToken,
-            characterId: current.characterId,
-            ...current.pose,
-            moving: current.pose.moving && !document.hidden && !current.paused,
-            seq: ++sequence.current,
-          },
+          { ...update, worldId, sessionToken, seq: ++seq },
           controller.signal,
         );
-        if (disposed) return;
-        const peers = readPlayers(snapshot, latest().walkArea);
+        if (disposed || epoch !== pageEpoch) return;
+        if (typeof raw.accepted !== "boolean")
+          throw new Error("Invalid town presence snapshot.");
+        const peers = readPlayers(raw);
+        if ("action" in update && update.action === "release" && raw.accepted)
+          needsRelease = false;
+        hasConnected = true;
+        updateConnection("online");
         retryAt = 0;
         retryDelay = 1_000;
+        setPlayers(peers.length ? peers : NO_PLAYERS);
+        if (revision === duelRevision) setDuelSnapshot(raw.duels);
         clearTimeout(staleTimer);
-        hasPeers = peers.length > 0;
-        setPlayers(hasPeers ? peers : NO_PLAYERS);
-        if (hasPeers) staleTimer = setTimeout(clearPeers, STALE_AFTER);
-      } catch {
-        if (disposed) return;
+        staleTimer = setTimeout(clearPeers, STALE_AFTER);
+        return { ...raw, players: peers };
+      } catch (error) {
+        if (disposed || epoch !== pageEpoch) return;
+        const watching = "action" in update && update.action === "watch";
+        const missingEndpoint =
+          unavailableEndpoint(error) && (watching || status === "offline");
+        updateConnection(
+          !navigator.onLine ||
+            (!hasConnected && (import.meta.env.DEV || missingEndpoint))
+            ? "offline"
+            : "unavailable",
+        );
         retryAt = performance.now() + retryDelay;
         retryDelay = Math.min(retryDelay * 2, 8_000);
       } finally {
         clearTimeout(timeout);
-        pending = undefined;
-        if (!disposed) {
-          const state = latest();
-          const interval = document.hidden
-            ? HIDDEN_INTERVAL
-            : !state.paused && (state.pose.moving || hasPeers)
-              ? ACTIVE_INTERVAL
-              : IDLE_INTERVAL;
-          schedule(interval - (performance.now() - lastStart));
-        }
+        request = undefined;
       }
     };
+    const makePose = (
+      characterId: string,
+      stationary = false,
+    ): PresenceUpdate => {
+      const { pose, paused } = latest();
+      return {
+        ...pose,
+        characterId,
+        moving: !stationary && pose.moving && !document.hidden && !paused,
+      };
+    };
+    const schedule = (delay: number) => {
+      clearTimeout(timer);
+      if (disposed || leaving || claiming) return;
+      const now = performance.now();
+      timer = setTimeout(
+        poll,
+        Math.max(delay, retryAt - now, lastPoll + ACTIVE_INTERVAL - now),
+      );
+    };
+    const poll = () =>
+      void enqueue(async () => {
+        if (disposed || leaving || claiming) return;
+        lastPoll = performance.now();
+        const characterId = claimedId;
+        const snapshot = await send(
+          characterId
+            ? makePose(characterId)
+            : { action: needsRelease ? "release" : "watch" },
+        );
+        if (characterId && snapshot?.accepted === false) {
+          claimedId = undefined;
+          setClaim(undefined);
+          loseClaim(characterId);
+        }
+        const { pose, paused } = latest();
+        const duel = (
+          snapshot?.duels as { own?: { status?: string } } | undefined
+        )?.own;
+        const busy =
+          (duel && duel.status !== "finished") ||
+          (!paused && (pose.moving || snapshot?.players.length));
+        schedule(
+          document.hidden
+            ? HIDDEN_INTERVAL
+            : busy
+              ? ACTIVE_INTERVAL
+              : IDLE_INTERVAL,
+        );
+      });
+    const reconnect = () => {
+      retryAt = 0;
+      retryDelay = 1_000;
+      if (status === "offline") updateConnection("connecting");
+      schedule(0);
+    };
+    const releaseOnExit = () => {
+      if (!needsRelease) return;
+      needsRelease = false;
+      void fetch("/api/studio/presence", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "release",
+          worldId,
+          sessionToken,
+          seq: ++seq,
+        }),
+        keepalive: true,
+      }).catch(() => {});
+    };
+    const pageHide = () => {
+      leaving = true;
+      pageEpoch++;
+      clearTimeout(timer);
+      clearTimeout(staleTimer);
+      request?.abort();
+      releaseOnExit();
+      claimedId = undefined;
+      setClaim(undefined);
+      updateConnection(navigator.onLine ? "connecting" : "offline");
+      clearPeers();
+    };
+    const pageShow = () => {
+      if (!leaving) return;
+      leaving = false;
+      reconnect();
+    };
+    const offline = () => {
+      clearTimeout(staleTimer);
+      updateConnection("offline");
+      clearPeers();
+    };
 
-    wake.current = nudge;
-    document.addEventListener("visibilitychange", nudge);
+    session.current = {
+      claim: async (characterId) => {
+        if (claiming) return "unavailable";
+        if (claimedId === characterId && status === "online") return "accepted";
+        const epoch = pageEpoch;
+        claiming = true;
+        clearTimeout(timer);
+        const snapshot = await enqueue(async () => {
+          if (!navigator.onLine) {
+            updateConnection("offline");
+            return;
+          }
+          return send(makePose(characterId, true));
+        });
+        claiming = false;
+        if (disposed || leaving || epoch !== pageEpoch) {
+          schedule(0);
+          return "unavailable";
+        }
+        if (snapshot?.accepted) {
+          claimedId = characterId;
+          setClaim(characterId);
+        }
+        schedule(IDLE_INTERVAL);
+        if (!snapshot) return status === "offline" ? "offline" : "unavailable";
+        if (snapshot.accepted) return "accepted";
+        return snapshot.reason === "taken" ? "taken" : "unavailable";
+      },
+      release: () => {
+        if (!claimedId && !needsRelease) return;
+        claimedId = undefined;
+        setClaim(undefined);
+        void enqueue(async () => {
+          await send({ action: "release" });
+          schedule(IDLE_INTERVAL);
+        });
+      },
+      wake: () => {
+        if (!request) schedule(0);
+      },
+      applyDuels: (snapshot) => {
+        if (disposed || leaving) return;
+        duelRevision++;
+        setDuelSnapshot(snapshot);
+      },
+      credentials: () =>
+        claimedId && status === "online"
+          ? { worldId, sessionToken, characterId: claimedId }
+          : undefined,
+    };
+    window.addEventListener("pagehide", pageHide);
+    window.addEventListener("pageshow", pageShow);
     window.addEventListener("online", reconnect);
-    nudge();
+    window.addEventListener("offline", offline);
+    const wake = () => session.current?.wake();
+    document.addEventListener("visibilitychange", wake);
+    schedule(0);
     return () => {
       disposed = true;
       clearTimeout(timer);
       clearTimeout(staleTimer);
-      pending?.abort();
-      wake.current = undefined;
-      document.removeEventListener("visibilitychange", nudge);
+      request?.abort();
+      releaseOnExit();
+      session.current = undefined;
+      window.removeEventListener("pagehide", pageHide);
+      window.removeEventListener("pageshow", pageShow);
       window.removeEventListener("online", reconnect);
+      window.removeEventListener("offline", offline);
+      document.removeEventListener("visibilitychange", wake);
     };
-  }, [enabled, worldId]);
+  }, [worldId]);
 
-  useEffect(() => wake.current?.(), [characterId, pose.moving, paused]);
-  return enabled ? players : NO_PLAYERS;
+  useEffect(() => session.current?.wake(), [pose.moving, paused]);
+  const claim = useCallback(
+    (characterId: string) =>
+      session.current?.claim(characterId) ??
+      Promise.resolve<ClaimResult>("offline"),
+    [],
+  );
+  const release = useCallback(() => session.current?.release(), []);
+  const presenceCredentials = useCallback(
+    () => session.current?.credentials(),
+    [],
+  );
+  const refresh = useCallback(() => session.current?.wake(), []);
+  const applyDuels = useCallback(
+    (snapshot: unknown) => session.current?.applyDuels(snapshot),
+    [],
+  );
+  return {
+    players,
+    connection,
+    claimedCharacterId,
+    duelSnapshot,
+    claim,
+    release,
+    refresh,
+    applyDuels,
+    presenceCredentials,
+  };
 }

@@ -17,6 +17,7 @@ export function createStudioServer({
   matchBotSecret,
   fightGifs,
   presence,
+  townDuels,
 }) {
   const handle = async (request, response) => {
     response.setHeader("Cache-Control", "no-store");
@@ -31,23 +32,26 @@ export function createStudioServer({
       const matchInternal = url.pathname.startsWith("/internal/v1/");
       const presenceUpdate =
         url.pathname === "/presence" && request.method === "POST";
-      const bodyLimit = presenceUpdate ? PRESENCE_BODY_LIMIT : MAX_BODY;
+      const duelUpdate =
+        url.pathname === "/town-duels" && request.method === "POST";
+      const townUpdate = presenceUpdate || duelUpdate;
+      const bodyLimit = townUpdate ? PRESENCE_BODY_LIMIT : MAX_BODY;
       const chunks = [];
       let size = 0;
       if (
         Number(request.headers["content-length"]) > bodyLimit &&
-        presenceUpdate
+        townUpdate
       ) {
         send(413, { error: "Player update is too large." });
         return;
       }
-      const stream = presenceUpdate
+      const stream = townUpdate
         ? request.iterator({ destroyOnReturn: false })
         : request;
       for await (const chunk of stream) {
         size += chunk.length;
         if (size > bodyLimit) {
-          if (presenceUpdate) {
+          if (townUpdate) {
             send(413, { error: "Player update is too large." });
             return;
           }
@@ -103,7 +107,13 @@ export function createStudioServer({
           throw new StudioError("Invalid studio request.");
       }
       if (presence && presenceUpdate) {
-        send(200, presence.update(input));
+        const result = presence.update(input);
+        const duels = townDuels?.snapshot(input.worldId, input.sessionToken);
+        send(200, duels ? { ...result, duels } : result);
+        return;
+      }
+      if (townDuels && duelUpdate) {
+        send(200, townDuels.act(input));
         return;
       }
       if (matches && matchInternal) {

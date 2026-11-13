@@ -11,6 +11,9 @@ interface Props {
   actor: Character;
   other: Character;
   crew?: Character[];
+  onChallenge?: () => void;
+  challengePending?: boolean;
+  onFightingChange?: (fighting: boolean) => void;
   onPlay: (character: Character) => void;
   onClose: () => void;
 }
@@ -63,11 +66,19 @@ export function CharacterInteraction({
   actor,
   other,
   crew,
+  onChallenge,
+  challengePending,
+  onFightingChange,
   onPlay,
   onClose,
 }: Props) {
   const [mode, setMode] = useState<"menu" | "fight" | "kiss">("menu");
   const [kissFinished, setKissFinished] = useState(false);
+  useEffect(() => {
+    if (mode !== "fight") return;
+    onFightingChange?.(true);
+    return () => onFightingChange?.(false);
+  }, [mode, onFightingChange]);
   useEffect(() => {
     if (mode !== "kiss") return;
     const duration = window.matchMedia("(prefers-reduced-motion: reduce)")
@@ -100,21 +111,32 @@ export function CharacterInteraction({
       <InteractionStage actor={actor} other={other} kissing={mode === "kiss"} />
       {mode === "menu" ? (
         <div className="interaction-actions">
-          <button className="button primary" onClick={() => setMode("fight")}>
-            <Swords size={20} /> Fight
-          </button>
           <button
-            className="button secondary"
-            onClick={() => {
-              setKissFinished(false);
-              setMode("kiss");
-            }}
+            className="button primary"
+            disabled={challengePending}
+            onClick={onChallenge ?? (() => setMode("fight"))}
           >
-            <Heart size={20} /> Kiss
+            <Swords size={20} /> {challengePending ? "Sending…" : "Fight"}
           </button>
-          <button className="button secondary" onClick={() => onPlay(other)}>
-            <Play size={18} /> Play as {other.name}
-          </button>
+          {!onChallenge && (
+            <>
+              <button
+                className="button secondary"
+                onClick={() => {
+                  setKissFinished(false);
+                  setMode("kiss");
+                }}
+              >
+                <Heart size={20} /> Kiss
+              </button>
+              <button
+                className="button secondary"
+                onClick={() => onPlay(other)}
+              >
+                <Play size={18} /> Play as {other.name}
+              </button>
+            </>
+          )}
         </div>
       ) : (
         <div className="kiss-result">

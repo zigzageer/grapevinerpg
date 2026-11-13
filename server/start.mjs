@@ -8,6 +8,7 @@ import { createStudioServer } from "./studio-http.mjs";
 import { MatchService } from "./match-service.mjs";
 import { createFightGifRenderer, FightGifQueue } from "./fight-gif-queue.mjs";
 import { Presence } from "./presence.mjs";
+import { TownDuels } from "./town-duels.mjs";
 
 const env = process.env;
 for (const key of [
@@ -41,13 +42,22 @@ const fightGifs = new FightGifQueue({
     readStudioImage: (id) => store.image(id),
   }),
 });
+const townCharacter = (worldId, characterId) =>
+  store.character(worldId === "grapevine" ? "mint" : worldId, characterId);
 const presence = new Presence({
   canUseCharacter: (worldId, characterId) =>
-    store.character(worldId === "grapevine" ? "mint" : worldId, characterId)
-      ?.visible === 1,
+    townCharacter(worldId, characterId)?.visible === 1,
+});
+const townDuels = new TownDuels({
+  presence,
+  getCharacter: (worldId, characterId) => {
+    const row = townCharacter(worldId, characterId);
+    return row?.visible === 1 ? JSON.parse(row.data) : undefined;
+  },
 });
 const maintenanceTimer = setInterval(() => {
   presence.sweep();
+  townDuels.sweep();
   try {
     matches.sweep();
   } catch (error) {
@@ -62,6 +72,7 @@ const server = createStudioServer({
   matchBotSecret: env.MINT_MATCH_BOT_SECRET,
   fightGifs,
   presence,
+  townDuels,
   verifyVercel: createVercelVerifier({
     teamSlug: env.MINT_STUDIO_VERCEL_TEAM_SLUG || "tensymain-8759s-projects",
     teamId: env.MINT_STUDIO_VERCEL_TEAM_ID || "team_YMxRg3j0ixQCGCc8wjrgWSZz",

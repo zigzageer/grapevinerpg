@@ -15,14 +15,21 @@ const player = (index, overrides = {}) => ({
   seq: 0,
   ...overrides,
 });
+const action = (index, action, seq = 0, worldId = "mint") => ({
+  worldId,
+  sessionToken: sessionToken(index),
+  action,
+  seq,
+});
 
-test("shares positions between sessions, including players using the same character", () => {
+test("the first claimant owns a character and subsequent poses share its movement", () => {
   const presence = new Presence();
-  assert.deepEqual(presence.update(player(1)), { players: [] });
+  assert.deepEqual(presence.update(player(1)), { players: [], accepted: true });
 
-  const {
-    players: [first],
-  } = presence.update(player(2));
+  const conflict = presence.update(player(2));
+  const [first] = conflict.players;
+  assert.equal(conflict.accepted, false);
+  assert.equal(conflict.reason, "taken");
   assert.match(first.sessionId, /^[0-9a-f]{32}$/);
   assert.notEqual(first.sessionId, sessionToken(1).replaceAll("-", ""));
   assert.deepEqual(first, {
@@ -38,82 +45,164 @@ test("shares positions between sessions, including players using the same charac
     { status: 400 },
   );
 
-  const {
-    players: [second],
-  } = presence.update(
-    player(1, { x: 901.25, y: 606.5, facing: -1, moving: true, seq: 1 }),
-  );
-  assert.notEqual(second.sessionId, first.sessionId);
-  assert.equal(second.characterId, first.characterId);
-  assert.deepEqual(presence.update(player(2, { seq: 1 })), {
-    players: [{ ...first, x: 901.25, y: 606.5, facing: -1, moving: true }],
+  const moved = { x: 901.25, y: 606.5, facing: -1, moving: true };
+  presence.update(player(1, { ...moved, seq: 1 }));
+  assert.deepEqual(presence.update(action(2, "watch", 1)), {
+    accepted: true,
+    players: [{ ...first, ...moved }],
   });
   presence.update(player(1, { x: 900, y: 606.5, facing: -1, seq: 2 }));
-  assert.deepEqual(presence.update(player(2, { seq: 2 })), {
+  assert.deepEqual(presence.update(action(2, "watch", 2)), {
+    accepted: true,
     players: [{ ...first, x: 900, y: 606.5, facing: -1, moving: false }],
   });
 });
 
-test("isolates each world and moves a session without duplicating it", () => {
+test("a rejected character switch preserves the old claim and supersedes earlier requests", () => {
   const presence = new Presence();
-  const clan = player(3, { worldId: "grapevine" });
-  const discord = player(4, { worldId: "123456789012345678" });
-  const otherDiscord = player(5, { worldId: "123456789012345679" });
-
-  assert.deepEqual(presence.update(player(1)), { players: [] });
-  assert.deepEqual(presence.update(clan), { players: [] });
-  assert.deepEqual(presence.update(discord), { players: [] });
-  assert.deepEqual(presence.update(otherDiscord), { players: [] });
-  const {
-    players: [before],
-  } = presence.update(player(2));
-
+  presence.update(player(1));
+  presence.update(player(2, { characterId: "friend-3" }));
+  const taken = presence.update(player(1, { characterId: "friend-3", seq: 3 }));
+  assert.equal(taken.reason, "taken");
+  assert.equal(taken.players[0].characterId, "friend-3");
   assert.equal(
-    presence.update(player(1, { worldId: "grapevine", seq: 2 })).players.length,
-    1,
+    presence.update(player(1, { characterId: "friend-4", seq: 2 })).reason,
+    "stale",
   );
-  assert.deepEqual(presence.update(player(1, { seq: 1 })), { players: [] });
-  assert.deepEqual(presence.update(player(2, { seq: 1 })), { players: [] });
-  assert.deepEqual(presence.update(clan), { players: [before] });
-  assert.deepEqual(presence.update(discord), { players: [] });
-  assert.deepEqual(presence.update(otherDiscord), { players: [] });
-
-  presence.update(
-    player(1, { worldId: "grapevine", characterId: "friend-3", seq: 3 }),
+  assert.deepEqual(
+    presence.update(action(3, "watch")).players.map((p) => p.characterId),
+    ["you", "friend-3"],
   );
-  assert.deepEqual(presence.update(clan), {
-    players: [{ ...before, characterId: "friend-3" }],
-  });
+  const switched = presence.update(
+    player(1, { characterId: "friend-4", seq: 4 }),
+  );
+  assert.equal(switched.accepted, true);
+  assert.equal(presence.update(player(3)).accepted, true);
+  assert.equal(
+    presence.update(player(4, { characterId: "friend-4" })).reason,
+    "taken",
+  );
 });
 
-test("prunes expired sessions and keeps newer positions across reordered updates", () => {
+test("isolates claims per world and moves a session without leaving a duplicate", () => {
+  const presence = new Presence();
+  const discord = "123456789012345678";
+  const otherDiscord = "123456789012345679";
+  for (const [index, worldId] of [
+    "mint",
+    "grapevine",
+    discord,
+    otherDiscord,
+  ].entries()) {
+    assert.deepEqual(presence.update(player(index + 1, { worldId })), {
+      players: [],
+      accepted: true,
+    });
+  }
+
+  assert.equal(
+    presence.update(player(1, { worldId: "grapevine", seq: 2 })).reason,
+    "taken",
+  );
+  assert.equal(presence.update(player(5)).reason, "taken");
+  assert.equal(
+    presence.update(
+      player(1, { worldId: "grapevine", characterId: "friend-3", seq: 3 }),
+    ).accepted,
+    true,
+  );
+  assert.deepEqual(presence.update(action(5, "watch")).players, []);
+  assert.equal(
+    presence.update(action(5, "watch", 0, "grapevine")).players.length,
+    2,
+  );
+  assert.equal(
+    presence.update(action(5, "watch", 0, discord)).players.length,
+    1,
+  );
+  assert.equal(
+    presence.update(action(5, "watch", 0, otherDiscord)).players.length,
+    1,
+  );
+  assert.equal(presence.update(player(1, { seq: 1 })).reason, "stale");
+  presence.update(action(1, "release", 4));
+  assert.equal(
+    presence.playerForToken("grapevine", sessionToken(1)).characterId,
+    "friend-3",
+  );
+});
+
+test("release fences reordered poses, including a claim that has not arrived yet", () => {
+  const presence = new Presence();
+  presence.update(player(1, { seq: 1 }));
+  assert.equal(presence.update(action(1, "release", 0)).reason, "stale");
+  assert.equal(presence.update(action(1, "release", 3)).accepted, true);
+  assert.deepEqual(presence.update(player(1, { seq: 2 })), {
+    players: [],
+    accepted: false,
+    reason: "stale",
+  });
+  assert.equal(presence.update(player(2)).accepted, true);
+
+  presence.update(action(3, "release", 2));
+  assert.equal(
+    presence.update(player(3, { characterId: "friend-3", seq: 1 })).reason,
+    "stale",
+  );
+  assert.equal(
+    presence.update(player(3, { characterId: "friend-3", seq: 3 })).accepted,
+    true,
+  );
+});
+
+test("watch, reordered poses and rejected switches cannot keep a claim alive", () => {
   let now = 0;
   const presence = new Presence({ now: () => now });
   presence.update(player(1, { seq: 4 }));
 
   now = 5000;
   presence.update(player(1, { x: 999, seq: 5 }));
-  presence.update(player(2));
   now = 10_000;
-  presence.update(player(1, { x: 888, seq: 4 }));
-  presence.update(player(1, { x: 777, seq: 5 }));
+  assert.equal(presence.update(player(1, { x: 888, seq: 4 })).reason, "stale");
+  assert.equal(presence.update(player(1, { x: 777, seq: 5 })).reason, "stale");
+  presence.update(player(2, { characterId: "friend-3" }));
+  assert.equal(
+    presence.update(player(1, { characterId: "friend-3", seq: 6 })).reason,
+    "taken",
+  );
 
   now = 18_999;
-  assert.equal(presence.update(player(2, { seq: 1 })).players[0].x, 999);
+  assert.equal(presence.update(action(1, "watch", 7)).players.length, 1);
+  assert.equal(presence.update(action(2, "watch", 1)).players[0].x, 999);
   now = 19_000;
-  assert.deepEqual(presence.update(player(2, { seq: 2 })), { players: [] });
-
-  assert.equal(presence.update(player(1, { seq: 6 })).players.length, 1);
-  now = 33_001;
-  presence.sweep();
-  assert.deepEqual(presence.update(player(1, { seq: 7 })), { players: [] });
+  assert.deepEqual(presence.update(action(2, "watch", 2)).players, []);
+  assert.equal(presence.update(player(1, { seq: 5 })).reason, "stale");
+  assert.equal(presence.update(player(2, { seq: 3 })).accepted, true);
+  assert.equal(presence.update(player(1, { seq: 8 })).reason, "taken");
 });
 
-test("rejects invalid updates and bounds coordinates for each map type", () => {
+test("the server can read only the active claim for a public ID or its private token", () => {
+  let now = 0;
+  const presence = new Presence({ now: () => now });
+  presence.update(player(1, { worldId: "grapevine", fighting: true }));
+  const pose = presence.playerForToken("grapevine", sessionToken(1));
+  assert.equal(pose.characterId, "you");
+  assert.equal(pose.fighting, undefined);
+  assert.deepEqual(presence.findPlayer("grapevine", pose.sessionId), pose);
+  assert.equal(presence.findPlayer("mint", pose.sessionId), undefined);
+  assert.equal(presence.playerForToken("grapevine", pose.sessionId), undefined);
+  pose.x = 0;
+  assert.equal(presence.findPlayer("grapevine", pose.sessionId).x, 850.125);
+  now = 14_000;
+  assert.equal(presence.findPlayer("grapevine", pose.sessionId), undefined);
+});
+
+test("validates actions, IDs, and coordinates for each map type", () => {
   const presence = new Presence();
   for (const input of [null, [], "", {}])
     assert.throws(() => presence.update(input), { status: 400 });
   for (const invalid of [
+    { action: "unknown" },
     { worldId: "town-preview" },
     { worldId: ["mint"] },
     { worldId: "1234567890123456" },
@@ -142,7 +231,7 @@ test("rejects invalid updates and bounds coordinates for each map type", () => {
     presence.update(
       player(1, { worldId: "123456789012345678", x: 3600, y: 3000 }),
     ),
-    { players: [] },
+    { players: [], accepted: true },
   );
 });
 
@@ -157,42 +246,66 @@ test("rejects unpublished characters before changing a player's presence", () =>
     { status: 404 },
   );
   assert.throws(
-    () => presence.update(player(1, { worldId: "grapevine", seq: 1 })),
-    {
-      status: 404,
-    },
+    () => presence.update(player(1, { worldId: "grapevine", seq: 2 })),
+    { status: 404 },
   );
-  assert.equal(presence.update(player(2)).players[0].characterId, "you");
+  assert.equal(
+    presence.update(action(2, "watch")).players[0].characterId,
+    "you",
+  );
 });
 
-test("caps active players per world and keeps an existing player during a refused switch", () => {
+test("caps room occupancy and keeps the previous claim after a refused switch", () => {
   let now = 0;
   const presence = new Presence({ now: () => now });
   presence.update(player(1, { worldId: "grapevine" }));
-  for (let index = 2; index <= 65; index++) presence.update(player(index));
+  for (let index = 2; index <= 65; index++)
+    presence.update(player(index, { characterId: `friend-${index}` }));
 
+  assert.equal(presence.update(action(66, "watch")).players.length, 64);
   assert.throws(() => presence.update(player(66)), { status: 429 });
   assert.throws(() => presence.update(player(1, { seq: 1 })), { status: 429 });
   assert.equal(
-    presence.update(player(66, { worldId: "grapevine" })).players.length,
+    presence.update(action(66, "watch", 1, "grapevine")).players.length,
     1,
   );
-  assert.equal(presence.update(player(2, { seq: 1 })).players.length, 63);
+  assert.equal(
+    presence.update(player(2, { characterId: "friend-2", seq: 1 })).players
+      .length,
+    63,
+  );
 
   now = 14_000;
-  assert.deepEqual(presence.update(player(66, { seq: 1 })), { players: [] });
+  assert.deepEqual(presence.update(player(66, { seq: 2 })), {
+    players: [],
+    accepted: true,
+  });
 });
 
-test("bounds retained sessions across all rooms and reclaims space after expiry", () => {
+test("caps active claims across rooms without counting spectators", () => {
   let now = 0;
   const presence = new Presence({ now: () => now });
-  for (let index = 1; index <= 2048; index++)
-    presence.update(
-      player(index, { worldId: `1${String(index).padStart(16, "0")}` }),
+  const guild = (index) => `1${String(index).padStart(16, "0")}`;
+  for (let index = 1; index <= 2048; index++) {
+    presence.update(action(index + 2048, "watch"));
+    assert.equal(
+      presence.update(player(index, { worldId: guild(index) })).accepted,
+      true,
     );
+  }
   assert.throws(() => presence.update(player(2049)), { status: 503 });
-  assert.deepEqual(presence.update(player(1, { seq: 1 })), { players: [] });
+  assert.equal(
+    presence.update(action(2050, "watch", 1, guild(1))).players.length,
+    1,
+  );
+  assert.equal(
+    presence.update(player(1, { worldId: guild(1), seq: 1 })).accepted,
+    true,
+  );
 
   now = 14_000;
-  assert.deepEqual(presence.update(player(2049)), { players: [] });
+  assert.deepEqual(presence.update(player(2049, { seq: 1 })), {
+    players: [],
+    accepted: true,
+  });
 });

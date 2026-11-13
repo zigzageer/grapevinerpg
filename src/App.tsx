@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useEffectEvent,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   ArrowRight,
   Check,
@@ -35,13 +42,14 @@ import {
 } from "./game/model";
 import { DEFAULT_ZOOM, MIN_ZOOM, MAX_ZOOM, followCamera } from "./game/camera";
 import { findPath } from "./game/navigation";
-import { Town } from "./components/Town";
+import { Town, type TownFight } from "./components/Town";
 import { ResidentDialogue } from "./components/TownLife";
 import type { ResidentConversation } from "./game/town-life";
 import { Portrait } from "./components/Character";
 import { Modal } from "./components/Modal";
 import { CharacterStudio } from "./components/CharacterStudio";
 import { CharacterInteraction } from "./components/CharacterInteraction";
+import { TownDuelNotice } from "./components/TownDuelNotice";
 import {
   mergeStudioCrew,
   readAppliedVersions,
@@ -52,6 +60,11 @@ import {
 } from "./game/studio";
 import { mintStudioSeed } from "./game/studio-seed";
 import { publicMintRoster, useTownPresence } from "./game/presence";
+import {
+  readTownDuels,
+  requestTownDuel,
+  type TownDuelAction,
+} from "./game/town-duels";
 import { CrewEditor } from "./components/CrewEditor";
 import { TouchJoystick } from "./components/TouchJoystick";
 import { TownMap } from "./components/TownMap";
@@ -169,6 +182,9 @@ function Game({
     [target, setTarget] = useState<Point | null>(null);
   const [openPanel, setPanel] = useState<Panel>(null),
     [search, setSearch] = useState("");
+  const [pendingCharacterId, setPendingCharacterId] = useState<string>();
+  const [selectionError, setSelectionError] = useState("");
+  const selecting = useRef(false);
   const sharedUpdatedAt = useRef(0);
   const [publicCrew, setPublicCrew] = useState(
     () => server?.characters ?? mintStudioSeed.characters,
@@ -177,7 +193,13 @@ function Game({
   const [interaction, setInteraction] = useState<{
     actor: Character;
     other: Character;
+    point: Point;
+    opponentSessionId?: string;
   } | null>(null);
+  const [localFighting, setLocalFighting] = useState(false);
+  const [duelPending, setDuelPending] = useState(false);
+  const sendingDuel = useRef(false);
+  const [dismissedDuel, setDismissedDuel] = useState<string>();
   const [conversation, setConversation] = useState<ResidentConversation | null>(
     null,
   );
@@ -194,6 +216,7 @@ function Game({
     stick = useRef<Point>({ x: 0, y: 0 }),
     path = useRef<Point[]>([]),
     state = useRef(game),
+    canSave = useRef(true),
     blocked = useRef(false);
   const viewportRef = useRef<HTMLDivElement>(null),
     sceneRef = useRef<HTMLDivElement>(null),
@@ -211,48 +234,15 @@ function Game({
   );
   const selectRef = useRef<(direction: number) => void>(() => {}),
     openRef = useRef<(p: Exclude<Panel, null>) => void>(() => {});
-  const active = game.crew.find((c) => c.id === game.activeCharacter);
-  const activeKey = active?.id ?? "";
-  const panel = openPanel ?? (active ? null : "characters");
   const tvLook = game.tvLook !== false;
   const canUseStudio = !preview && studioAvailable();
   const publicRoster = useMemo(
     () => new Map(publicCrew.map((c) => [c.id, c])),
     [publicCrew],
   );
-  const publicCharacter = publicRoster.get(activeKey);
-  const presenceCharacterId =
-    active &&
-    publicCharacter &&
-    active.kind === publicCharacter.kind &&
-    active.preset === publicCharacter.preset &&
-    active.sprite === publicCharacter.sprite
-      ? activeKey
-      : undefined;
   const worldId = server?.guildId ?? (clan ? "grapevine" : "mint");
-  const presence = useTownPresence(
-    canUseStudio ? worldId : undefined,
-    presenceCharacterId,
-    { ...player, moving, facing },
-    !!panel,
-    town?.walkArea,
-  );
-  const remotePlayers = useMemo(
-    () =>
-      presence.flatMap((p) => {
-        const character = publicRoster.get(p.characterId);
-        return character ? [{ ...p, character }] : [];
-      }),
-    [presence, publicRoster],
-  );
-  walkArea.current = town?.walkArea;
-  state.current = game;
-  blocked.current = !!panel;
-  const notify = useCallback((message: string) => {
-    setToast(message);
-    clearTimeout(timer.current);
-    timer.current = setTimeout(() => setToast(""), 3500);
-  }, []);
+  const presenceWorldId = canUseStudio ? worldId : undefined;
+  const savedCharacter = game.crew.find((c) => c.id === game.activeCharacter);
   const stop = useCallback(() => {
     keys.current.clear();
     stick.current = { x: 0, y: 0 };
@@ -262,31 +252,213 @@ function Game({
     setRunning(false);
     setInputReset((v) => v + 1);
   }, []);
-  const select = useCallback(
-    (c: Character) => {
-      stop();
-      setGame((g) => ({ ...g, activeCharacter: characterKey(c) }));
+  const rejectSavedCharacter = (id: string) => {
+    const c = state.current.crew.find((character) => character.id === id);
+    stop();
+    setGame((current) =>
+      current.activeCharacter === id
+        ? { ...current, activeCharacter: undefined }
+        : current,
+    );
+    setPanel("characters");
+    setSelectionError(
+      `${c?.name ?? "That character"} is already playing in this town.`,
+    );
+  };
+  const {
+    players,
+    connection,
+    claim,
+    release,
+    claimedCharacterId,
+    presenceCredentials,
+    duelSnapshot,
+    refresh,
+    applyDuels,
+  } = useTownPresence(
+    presenceWorldId,
+    { ...player, moving, facing },
+    Boolean(openPanel || !savedCharacter || pendingCharacterId || duelPending),
+    (id) => {
+      if (state.current.activeCharacter === id) rejectSavedCharacter(id);
     },
-    [stop],
   );
-  const choose = (c: Character) => {
-    select(c);
+  const active =
+    savedCharacter &&
+    (!presenceWorldId ||
+      !publicRoster.has(savedCharacter.id) ||
+      claimedCharacterId === savedCharacter.id ||
+      connection === "offline")
+      ? savedCharacter
+      : undefined;
+  const activeKey = active?.id ?? "";
+  const panel = openPanel ?? (active ? null : "characters");
+  const townDuels = useMemo(() => readTownDuels(duelSnapshot), [duelSnapshot]);
+  const myDuel = townDuels.own;
+  const onlineFighting = myDuel?.status === "fighting";
+  const fights = useMemo(() => {
+    const markers: TownFight[] = [];
+    for (const marker of townDuels.fights) {
+      const [first, second] = marker.characterIds.map((id) =>
+        publicRoster.get(id),
+      );
+      if (first && second)
+        markers.push({ ...marker, fighters: [first, second] });
+    }
+    if (localFighting && interaction && !interaction.opponentSessionId) {
+      markers.push({
+        id: "local-fight",
+        x: interaction.point.x,
+        y: interaction.point.y,
+        fighters: [interaction.actor, interaction.other],
+      });
+    }
+    return markers;
+  }, [townDuels.fights, publicRoster, localFighting, interaction]);
+  const occupied = useMemo(
+    () => new Set(players.map((p) => p.characterId)),
+    [players],
+  );
+  const remotePlayers = useMemo(
+    () =>
+      players.flatMap((p) => {
+        const character = publicRoster.get(p.characterId);
+        return character && canStand(p, town?.walkArea)
+          ? [{ ...p, character }]
+          : [];
+      }),
+    [players, publicRoster, town?.walkArea],
+  );
+  walkArea.current = town?.walkArea;
+  state.current = game;
+  canSave.current = !savedCharacter || !!active;
+  blocked.current = Boolean(panel || pendingCharacterId || onlineFighting);
+  useEffect(() => {
+    if (onlineFighting) stop();
+  }, [onlineFighting, stop]);
+  const notify = useCallback((message: string) => {
+    setToast(message);
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => setToast(""), 3500);
+  }, []);
+  const select = async (c: Character, restoring = false) => {
+    if (selecting.current || onlineFighting || sendingDuel.current)
+      return false;
+    const id = characterKey(c);
+    const showError = (message: string) => {
+      setSelectionError(message);
+      if (!restoring && panel !== "characters") notify(message);
+    };
+    if (occupied.has(id)) {
+      if (restoring) rejectSavedCharacter(id);
+      else showError(`${c.name} is already playing in this town.`);
+      return false;
+    }
+    stop();
+    setSelectionError("");
+    if (presenceWorldId && publicRoster.has(id)) {
+      selecting.current = true;
+      setPendingCharacterId(id);
+      const result = await claim(id);
+      selecting.current = false;
+      setPendingCharacterId(undefined);
+      if (result === "taken") {
+        if (restoring) rejectSavedCharacter(id);
+        else showError(`${c.name} is already playing in this town.`);
+        return false;
+      }
+      if (result === "unavailable") {
+        showError("Couldn’t connect to this town. Try again in a moment.");
+        return false;
+      }
+      if (result === "offline") release();
+    } else {
+      release();
+    }
+    if (!state.current.crew.some((character) => character.id === id)) {
+      release();
+      return false;
+    }
+    setGame((g) => ({ ...g, activeCharacter: id }));
+    return true;
+  };
+  const choose = async (c: Character) => {
+    if (!(await select(c))) return false;
     setPanel(null);
     setSearch("");
+    return true;
   };
+  const restoreCharacter = useEffectEvent((c: Character) => {
+    void select(c, true);
+  });
+  useEffect(() => {
+    if (
+      connection !== "online" ||
+      !savedCharacter ||
+      !publicRoster.has(savedCharacter.id) ||
+      claimedCharacterId === savedCharacter.id ||
+      selecting.current
+    )
+      return;
+    restoreCharacter(savedCharacter);
+  }, [connection, savedCharacter, publicRoster, claimedCharacterId]);
+  useEffect(() => {
+    if (
+      !selecting.current &&
+      claimedCharacterId &&
+      (!savedCharacter || !publicRoster.has(savedCharacter.id))
+    )
+      release();
+  }, [claimedCharacterId, savedCharacter, publicRoster, release]);
   selectRef.current = (direction) => {
-    const i = game.crew.findIndex((c) => characterKey(c) === activeKey);
-    select(game.crew[(i + direction + game.crew.length) % game.crew.length]);
+    const crew = game.crew.filter((c) => !occupied.has(c.id));
+    if (!crew.length) return;
+    const i = crew.findIndex((c) => characterKey(c) === activeKey);
+    void select(crew[(i + direction + crew.length) % crew.length]);
   };
   const open = useCallback(
     (p: Exclude<Panel, null>) => {
       stop();
       setPanel(p);
       setSearch("");
+      setSelectionError("");
     },
     [stop],
   );
   openRef.current = open;
+  const closeInteraction = () => {
+    setPanel((current) => (current === "interact" ? null : current));
+    setInteraction(null);
+  };
+  const actOnDuel = async (action: TownDuelAction) => {
+    if (sendingDuel.current) return;
+    const credentials = presenceCredentials();
+    if (!credentials) {
+      notify("Choose an available online character to fight.");
+      return;
+    }
+    sendingDuel.current = true;
+    setDuelPending(true);
+    try {
+      const snapshot = await requestTownDuel(credentials, action);
+      const current = presenceCredentials();
+      if (
+        current?.sessionToken === credentials.sessionToken &&
+        current.characterId === credentials.characterId
+      )
+        applyDuels(snapshot);
+      if (action.action === "challenge") closeInteraction();
+      if (action.action === "accept") stop();
+      refresh();
+    } catch (error) {
+      notify(
+        error instanceof Error ? error.message : "The fight request failed.",
+      );
+    } finally {
+      sendingDuel.current = false;
+      setDuelPending(false);
+    }
+  };
   const openWorkshop = () => {
     setEditorCharacter(undefined);
     open("crew");
@@ -579,6 +751,7 @@ function Game({
     };
   }, []);
   useEffect(() => {
+    if (!canSave.current) return;
     const timeout = setTimeout(() => {
       try {
         localStorage.setItem(
@@ -591,9 +764,10 @@ function Game({
       }
     }, 350);
     return () => clearTimeout(timeout);
-  }, [game, player, saveKey, town?.guildId]);
+  }, [game, player, activeKey, saveKey, town?.guildId]);
   useEffect(() => {
     const save = () => {
+      if (!canSave.current) return;
       try {
         localStorage.setItem(
           saveKey,
@@ -659,6 +833,8 @@ function Game({
               activeKey={activeKey}
               target={target}
               remotePlayers={remotePlayers}
+              occupiedCharacterIds={occupied}
+              fights={fights}
               townName={townName}
               serverTown={town}
               paused={!!panel}
@@ -673,9 +849,19 @@ function Game({
               onMove={(point) => {
                 if (!blocked.current) walkTo(point);
               }}
-              onSelect={(other) => {
-                if (!active) return;
-                setInteraction({ actor: active, other });
+              onSelect={(other, point) => {
+                if (!active || onlineFighting) return;
+                setInteraction({ actor: active, other, point });
+                open("interact");
+              }}
+              onSelectRemote={(opponentSessionId, other, point) => {
+                if (!active || onlineFighting) return;
+                setInteraction({
+                  actor: active,
+                  other,
+                  point,
+                  opponentSessionId,
+                });
                 open("interact");
               }}
             />
@@ -762,7 +948,7 @@ function Game({
           </div>
           <div className="hud-movement">
             <TouchJoystick
-              disabled={!!panel}
+              disabled={!!panel || onlineFighting}
               resetKey={`${activeKey}:${inputReset}`}
               onMove={setStick}
             />
@@ -771,6 +957,7 @@ function Game({
             className={`hold-run ${running ? "running" : ""}`}
             aria-label="Hold to run"
             aria-pressed={running}
+            disabled={onlineFighting}
             onPointerDown={(e) => {
               e.preventDefault();
               e.currentTarget.setPointerCapture(e.pointerId);
@@ -795,6 +982,15 @@ function Game({
           </button>
         </div>
       </div>
+      {!panel && active && myDuel && myDuel.id !== dismissedDuel && (
+        <TownDuelNotice
+          duel={myDuel}
+          roster={publicRoster}
+          pending={duelPending}
+          onAction={(action) => void actOnDuel(action)}
+          onDismiss={() => setDismissedDuel(myDuel.id)}
+        />
+      )}
       {toast && (
         <div className="game-toast" role="status">
           <Sparkles size={16} />
@@ -837,6 +1033,11 @@ function Game({
               </button>
             )}
           </div>
+          {(selectionError || pendingCharacterId) && (
+            <p className="picker-status" role="status">
+              {pendingCharacterId ? "Checking availability…" : selectionError}
+            </p>
+          )}
           <div
             className="picker-grid"
             role="group"
@@ -844,18 +1045,24 @@ function Game({
           >
             {filtered.map((c) => {
               const selected = c.id === activeKey;
+              const taken = occupied.has(c.id);
               return (
                 <div className="picker-card" key={c.id}>
                   <button
                     className={`picker-character ${selected ? "selected" : ""}`}
                     aria-label={`Play as ${c.name}`}
+                    aria-description={
+                      taken ? "Already playing in this town" : undefined
+                    }
                     aria-pressed={selected}
-                    onClick={() => choose(c)}
+                    disabled={taken || !!pendingCharacterId}
+                    onClick={() => void choose(c)}
                   >
                     <span className="picker-portrait">
                       <Portrait c={c} />
                     </span>
                     <strong>{c.name}</strong>
+                    {taken && <span className="picker-occupied">In use</span>}
                     {selected && (
                       <span className="picker-check">
                         <Check size={14} />
@@ -1009,13 +1216,20 @@ function Game({
           actor={interaction.actor}
           other={interaction.other}
           crew={game.crew}
-          onClose={() => {
-            setPanel(null);
-            setInteraction(null);
-          }}
-          onPlay={(character) => {
-            choose(character);
-            setInteraction(null);
+          challengePending={duelPending}
+          onChallenge={
+            interaction.opponentSessionId
+              ? () => {
+                  const opponentSessionId = interaction.opponentSessionId;
+                  if (opponentSessionId)
+                    void actOnDuel({ action: "challenge", opponentSessionId });
+                }
+              : undefined
+          }
+          onFightingChange={setLocalFighting}
+          onClose={closeInteraction}
+          onPlay={async (character) => {
+            if (await choose(character)) setInteraction(null);
           }}
         />
       )}

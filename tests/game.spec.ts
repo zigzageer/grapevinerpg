@@ -51,6 +51,9 @@ test("residents talk and roam while street traffic and the winter parade pass th
   page,
 }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
+  await page.route("**/api/studio/presence", (route) =>
+    route.fulfill({ status: 404, json: {} }),
+  );
   const start = new Date("2026-11-11T12:00:00Z");
   await page.clock.install({ time: start });
   await page.clock.pauseAt(new Date(start.getTime() + 1000));

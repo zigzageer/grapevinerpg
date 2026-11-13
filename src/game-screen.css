@@ -38,6 +38,8 @@ body {
 .world-viewport {
   overflow: hidden;
   touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
 }
 .world-layer {
   transition: filter 0.2s;
@@ -47,12 +49,26 @@ body {
   height: 100%;
   display: block;
 }
+.town-svg,
+.town-svg image {
+  -webkit-user-drag: none;
+}
 .remote-citizen {
-  pointer-events: none;
   transition: transform 320ms linear;
+}
+.remote-citizen[role="button"] {
+  cursor: pointer;
+  outline: none;
+}
+.remote-citizen[role="img"] {
+  pointer-events: none;
 }
 .remote-citizen .nameplate {
   opacity: 1;
+}
+.remote-citizen:focus-visible .nameplate rect {
+  stroke: #24647b;
+  stroke-width: 3;
 }
 @media (prefers-reduced-motion: reduce) {
   .remote-citizen {
@@ -590,9 +606,32 @@ body {
   width: 100%;
   height: 100%;
 }
-.picker-character:hover {
+.picker-character:enabled:hover {
   background: #314e35;
   border-color: #bdcf8d66;
+}
+.picker-character:disabled {
+  cursor: default;
+}
+.picker-character:disabled .picker-portrait {
+  opacity: 0.65;
+}
+.picker-occupied {
+  position: absolute;
+  left: 5px;
+  top: 6px;
+  padding: 2px 5px;
+  border-radius: 5px;
+  background: #dacb9a;
+  color: #31291a;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+.picker-status {
+  margin: 0 0 8px;
+  color: #e5d5a4;
+  font-size: 13px;
 }
 .picker-character.selected {
   background: #3d5b3b;

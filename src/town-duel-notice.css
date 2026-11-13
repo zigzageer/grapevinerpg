@@ -1,0 +1,40 @@
+.town-duel-notice {
+  position: fixed;
+  z-index: 12;
+  inset: max(88px, calc(env(safe-area-inset-top) + 74px)) 12px auto;
+  width: min(380px, calc(100% - 24px));
+  margin-inline: auto;
+  padding: 12px 14px;
+  display: grid;
+  gap: 10px;
+  border: 1px solid #aa9965;
+  border-radius: 14px;
+  background: #242832;
+  color: #fff3d8;
+  box-shadow: 0 8px 26px #19141d55;
+}
+
+.town-duel-heading,
+.town-duel-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.town-duel-heading {
+  line-height: 1.25;
+}
+
+.town-duel-heading svg {
+  flex: none;
+  color: #ffc879;
+}
+
+.town-duel-heading strong {
+  overflow-wrap: anywhere;
+}
+
+.town-duel-actions button {
+  min-height: 40px;
+}

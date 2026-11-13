@@ -1,6 +1,6 @@
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import type { Character, Point } from "../game/model";
-import { canStand, characterKey } from "../game/model";
+import { canStand, characterKey, characterScale } from "../game/model";
 import type { CameraView } from "../game/camera";
 import type { RemotePlayer } from "../game/presence";
 import { CharacterArt } from "./Character";
@@ -22,6 +22,9 @@ import {
 import { TownResident, TownShadow, TownVehicle } from "./TownLife";
 import { ServerTownScenery } from "./ServerTownScenery";
 import type { ServerTown } from "../game/server-town";
+import { TownFightMarker, type TownFight } from "./TownFight";
+
+export type { TownFight } from "./TownFight";
 
 function Pine({ x, y, s = 1 }: Point & { s?: number }) {
   return (
@@ -388,14 +391,22 @@ interface Props {
   activeKey: string;
   target: Point | null;
   onMove: (point: Point) => void;
-  onSelect: (character: Character) => void;
+  onSelect: (character: Character, point: Point) => void;
+  onSelectRemote?: (
+    sessionId: string,
+    character: Character,
+    point: Point,
+  ) => void;
   onTalk?: (conversation: ResidentConversation) => void;
   paused?: boolean;
   townName?: string;
   serverTown?: ServerTown;
   remotePlayers?: Array<RemotePlayer & { character: Character }>;
+  occupiedCharacterIds?: ReadonlySet<string>;
+  fights?: readonly TownFight[];
 }
 const NO_REMOTE_PLAYERS: NonNullable<Props["remotePlayers"]> = [];
+const NO_FIGHTS: readonly TownFight[] = [];
 const CITIZEN_SPOTS: Point[] = [
   { x: 225, y: 552 },
   { x: 450, y: 552 },
@@ -448,11 +459,14 @@ export function Town({
   target,
   onMove,
   onSelect,
+  onSelectRemote,
   onTalk,
   paused = false,
   townName = TOWN_NAME,
   serverTown,
   remotePlayers = NO_REMOTE_PLAYERS,
+  occupiedCharacterIds,
+  fights = NO_FIGHTS,
 }: Props) {
   const [life, setLife] = useState(createTownLife);
   const live = useRef(life);
@@ -503,22 +517,22 @@ export function Town({
     return spots;
   }, [serverTown, crew.length]);
   const occupied = useMemo(
-    () => new Map(remotePlayers.map((p) => [p.characterId, p.character])),
-    [remotePlayers],
+    () => {
+      const ids = new Set(occupiedCharacterIds);
+      for (const { characterId } of remotePlayers) ids.add(characterId);
+      return ids;
+    },
+    [occupiedCharacterIds, remotePlayers],
+  );
+  const fighting = useMemo(
+    () => new Set(fights.flatMap(({ fighters }) => fighters.map(characterKey))),
+    [fights],
   );
   const entities = [
     ...crew.flatMap((c, i) => {
       const id = characterKey(c);
       const active = id === activeKey;
-      const other = occupied.get(id);
-      if (
-        !active &&
-        other &&
-        c.kind === other.kind &&
-        c.preset === other.preset &&
-        c.sprite === other.sprite
-      )
-        return [];
+      if (fighting.has(id) || (!active && occupied.has(id))) return [];
       return [
         {
           kind: "crew" as const,
@@ -531,16 +545,18 @@ export function Town({
         },
       ];
     }),
-    ...remotePlayers.map((p) => ({
-      kind: "crew" as const,
-      c: p.character,
-      id: p.characterId,
-      active: false,
-      remote: p,
-      key: `remote-${p.sessionId}`,
-      x: p.x,
-      y: p.y,
-    })),
+    ...remotePlayers
+      .filter(({ characterId }) => !fighting.has(characterId))
+      .map((p) => ({
+        kind: "crew" as const,
+        c: p.character,
+        id: p.characterId,
+        active: false,
+        remote: p,
+        key: `remote-${p.sessionId}`,
+        x: p.x,
+        y: p.y,
+      })),
     ...(onTalk
       ? life.residents.map((walker) => ({
           kind: "resident" as const,
@@ -572,6 +588,7 @@ export function Town({
       className="town-svg"
       viewBox={`${camera.x} ${camera.y} ${camera.width} ${camera.height}`}
       aria-label={`${townName} free-roam town. Click the ground to walk or a character to interact with them.`}
+      onDragStart={(event) => event.preventDefault()}
       onPointerDown={(e) => {
         if (e.button !== 0) return;
         const matrix = e.currentTarget.getScreenCTM();
@@ -621,42 +638,67 @@ export function Town({
           );
         }
         const { active, remote } = e;
-        const interactive = !active && !remote;
-        const className = remote
-          ? "remote-citizen"
-          : active
-            ? "active-citizen"
-            : "world-citizen";
-        const label = remote
-          ? `${e.c.name}, live player`
-          : interactive
-            ? `Interact with ${e.c.name}`
+        const select = remote
+          ? onSelectRemote &&
+            (() => onSelectRemote(remote.sessionId, e.c, { x: e.x, y: e.y }))
+          : !active
+            ? () => onSelect(e.c, { x: e.x, y: e.y })
             : undefined;
+        const label = select
+          ? `Interact with ${e.c.name}`
+          : remote
+            ? `${e.c.name}, live player`
+            : undefined;
+        const hitHeight = Math.max(72, 86.4 * characterScale(e.c));
         return (
           <g
             key={e.key}
-            role={remote ? "img" : interactive ? "button" : undefined}
-            tabIndex={interactive ? 0 : undefined}
+            role={select ? "button" : remote ? "img" : undefined}
+            tabIndex={select ? 0 : undefined}
             aria-label={label}
-            className={className}
+            aria-description={remote && select ? "Online player" : undefined}
+            data-session={remote?.sessionId}
+            className={
+              active
+                ? "active-citizen"
+                : remote
+                  ? "remote-citizen"
+                  : "world-citizen"
+            }
             transform={remote ? undefined : `translate(${e.x} ${e.y})`}
             style={
               remote
                 ? { transform: `translate(${e.x}px, ${e.y}px)` }
                 : undefined
             }
-            onPointerDown={(event) => event.stopPropagation()}
-            onClick={(event) => {
-              event.stopPropagation();
-              if (interactive) onSelect(e.c);
-            }}
-            onKeyDown={(event) => {
-              if (interactive && (event.key === "Enter" || event.key === " ")) {
-                event.preventDefault();
-                onSelect(e.c);
-              }
-            }}
+            onPointerDown={select && ((event) => event.stopPropagation())}
+            onClick={
+              select &&
+              ((event) => {
+                event.stopPropagation();
+                select();
+              })
+            }
+            onKeyDown={
+              select &&
+              ((event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  if (!event.repeat) select();
+                }
+              })
+            }
           >
+            {remote && select && (
+              <rect
+                x="-38"
+                y={-hitHeight}
+                width="76"
+                height={hitHeight + 8}
+                fill="transparent"
+                aria-hidden="true"
+              />
+            )}
             {active && (
               <ellipse
                 cy="2"
@@ -710,6 +752,9 @@ export function Town({
           </g>
         );
       })}
+      {fights.map((fight) => (
+        <TownFightMarker key={fight.id} fight={fight} />
+      ))}
     </svg>
   );
 }

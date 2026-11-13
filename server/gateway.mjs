@@ -12,7 +12,7 @@ const readRoute = new RegExp(
   `^/(?:health|drafts/${gameId}|games/${gameId}|games/${gameId}/characters/${characterId}/history|jobs/${uuid}|matches/${uuid}|assets/${uuid}\\.png)$`,
 );
 const writeRoute = new RegExp(
-  `^/(?:generations|presence|games/${gameId}/characters/${characterId}/apply)$`,
+  `^/(?:generations|presence|town-duels|games/${gameId}/characters/${characterId}/apply)$`,
 );
 
 export async function studioGateway(
@@ -50,9 +50,9 @@ export async function studioGateway(
       "The character studio is being connected. Please try again shortly.",
       503,
     );
-  const presence = path === "/presence";
-  const bodyLimit = presence ? PRESENCE_BODY_LIMIT : MAX_BODY;
-  const tooLarge = presence
+  const townUpdate = path === "/presence" || path === "/town-duels";
+  const bodyLimit = townUpdate ? PRESENCE_BODY_LIMIT : MAX_BODY;
+  const tooLarge = townUpdate
     ? "Player update is too large."
     : "Upload a reference image smaller than 2 MB.";
   try {
@@ -60,7 +60,7 @@ export async function studioGateway(
       const origin = request.headers.get("origin");
       if (origin && origin !== url.origin)
         return json(
-          presence
+          townUpdate
             ? "Open this game directly to play online."
             : "Open this game directly to generate a character.",
           403,
@@ -108,7 +108,7 @@ export async function studioGateway(
       path,
       ip,
       body: Buffer.concat(chunks),
-      ...(presence ? { timeoutMs: 4000 } : {}),
+      ...(townUpdate ? { timeoutMs: 4000 } : {}),
     });
     return new Response(result.bytes, {
       status: result.status,

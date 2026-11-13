@@ -1,10 +1,10 @@
 import { test, expect, type BrowserContext } from "@playwright/test";
-import { createHash } from "node:crypto";
 import { DEFAULT_CREW } from "../src/game/model";
 import sampleGame from "../examples/server-town/game.json" with { type: "json" };
 import sampleTown from "../examples/server-town/town.json" with { type: "json" };
 import type { MatchSnapshot } from "../src/game/matches";
-import type { RemotePlayer } from "../src/game/presence";
+import { Presence } from "../server/presence.mjs";
+import { TownDuels } from "../server/town-duels.mjs";
 const GUILD = "123456789012345678",
   OTHER = "223456789012345678",
   USER = "323456789012345678";
@@ -262,41 +262,24 @@ test("Grapevine's home and direct link share live players across browsers", asyn
 }) => {
   const first = await browser.newContext();
   const second = await browser.newContext();
-  const rooms = new Map<string, Map<string, RemotePlayer & { seq: number }>>();
-  const gone = new Set<string>();
+  const rooms = new Presence();
   let online = true;
   const requests: string[] = [];
+  let secondMintAttempts = 0;
+  let refreshLobby: (() => void) | undefined;
+  const lobbyWait = new Promise<void>((resolve) => {
+    refreshLobby = resolve;
+  });
   const mockPresence = async (context: BrowserContext) => {
     await context.route("**/api/studio/presence", async (route) => {
-      const { worldId, sessionToken, seq, characterId, x, y, facing, moving } =
-        route.request().postDataJSON();
-      requests.push(worldId);
+      const input = route.request().postDataJSON();
+      requests.push(input.worldId);
       if (!online) return route.fulfill({ status: 503, json: {} });
-      const room = rooms.get(worldId) ?? new Map();
-      rooms.set(worldId, room);
-      const sessionId = createHash("sha256")
-        .update(sessionToken)
-        .digest("hex")
-        .slice(0, 32);
-      const previous = room.get(sessionId);
-      if (!gone.has(sessionId) && (!previous || previous.seq < seq)) {
-        room.set(sessionId, {
-          sessionId,
-          seq,
-          characterId,
-          x,
-          y,
-          facing,
-          moving,
-        });
+      if (context === second && input.worldId === "grapevine") {
+        if (input.action === "watch") await lobbyWait;
+        if (input.characterId === "you") secondMintAttempts++;
       }
-      return route.fulfill({
-        json: {
-          players: [...room.values()]
-            .filter((p) => p.sessionId !== sessionId)
-            .map(({ seq, ...player }) => player),
-        },
-      });
+      return route.fulfill({ json: rooms.update(input) });
     });
   };
   try {
@@ -310,11 +293,34 @@ test("Grapevine's home and direct link share live players across browsers", asyn
         page.getByRole("dialog", { name: "Choose a clan member" }),
       ).toBeVisible();
     }
-    expect(requests).toEqual([]);
-
     await home
       .getByRole("button", { name: "Play as Mint", exact: true })
       .click();
+    const homeSprite = home.getByTestId("player-sprite");
+    await expect(homeSprite).toHaveAttribute("data-character", "you");
+    const directMint = direct.getByRole("button", {
+      name: "Play as Mint",
+      exact: true,
+    });
+    await directMint.click();
+    await expect(direct.getByText("Checking availability…")).toBeVisible();
+    await expect(direct.getByTestId("player-sprite")).toHaveCount(0);
+    await direct.keyboard.press("d");
+    refreshLobby?.();
+    await expect(directMint).toBeDisabled();
+    await expect(directMint).toHaveAttribute(
+      "aria-description",
+      "Already playing in this town",
+    );
+    await expect(
+      direct.getByText("Mint is already playing in this town."),
+    ).toBeVisible();
+    await expect(direct.getByTestId("player-sprite")).toHaveCount(0);
+    expect(secondMintAttempts).toBe(1);
+    const rejectedSave = await direct.evaluate(() =>
+      JSON.parse(localStorage.getItem("grapevine.clan.v1") ?? "{}"),
+    );
+    expect(rejectedSave.activeCharacter).toBeUndefined();
     await direct
       .getByRole("button", { name: "Play as Zippy", exact: true })
       .click();
@@ -335,10 +341,9 @@ test("Grapevine's home and direct link share live players across browsers", asyn
       "data-character",
       "you",
     );
-    const zippyCitizen = home.getByRole("button", {
-      name: "Interact with Zippy",
-      exact: true,
-    });
+    const zippyCitizen = home.locator(
+      ".world-citizen [data-character='friend-9']",
+    );
     await expect(zippyCitizen).toHaveCount(0);
 
     await direct.keyboard.down("a");
@@ -350,7 +355,9 @@ test("Grapevine's home and direct link share live players across browsers", asyn
     } finally {
       await direct.keyboard.up("a");
     }
-    await direct.getByRole("button", { name: "Pause menu", exact: true }).click();
+    await direct
+      .getByRole("button", { name: "Pause menu", exact: true })
+      .click();
     await expect(
       direct.getByRole("link", { name: "Visit Adventures of Mint" }),
     ).toHaveAttribute("href", "/mint");
@@ -361,12 +368,12 @@ test("Grapevine's home and direct link share live players across browsers", asyn
     await direct
       .getByRole("button", { name: "Choose character", exact: true })
       .click();
+    await expect(directMint).toBeDisabled();
     await direct
-      .getByRole("button", { name: "Play as Mint", exact: true })
+      .getByRole("button", { name: "Play as David", exact: true })
       .click();
     await expect(peer).toHaveAttribute("data-session", peerSession);
-    await expect(peer).toHaveAttribute("data-character", "you");
-    const homeSprite = home.getByTestId("player-sprite");
+    await expect(peer).toHaveAttribute("data-character", "friend-5");
     await expect(homeSprite).toHaveAttribute("data-character", "you");
     await expect(zippyCitizen).toHaveCount(1);
 
@@ -379,22 +386,220 @@ test("Grapevine's home and direct link share live players across browsers", asyn
       timeout: 8_000,
     });
 
-    gone.add(peerSession);
-    rooms.get("grapevine")!.delete(peerSession);
+    const mintClaim = direct.waitForResponse((response) => {
+      const request = response.request();
+      return (
+        request.url().endsWith("/api/studio/presence") &&
+        request.postDataJSON().worldId === "mint" &&
+        request.postDataJSON().characterId === "you" &&
+        response.ok()
+      );
+    });
+    await direct.evaluate(() =>
+      window.dispatchEvent(new PageTransitionEvent("pagehide")),
+    );
     await direct.goto("/mint");
     await direct
       .getByRole("button", { name: "Play as Mint", exact: true })
       .click();
     await expect(direct.getByTestId("server-town-scenery")).toHaveCount(0);
-    await expect.poll(() => rooms.get("mint")?.size).toBe(1);
-    await expect(peer).toHaveCount(0);
+    expect((await (await mintClaim).json()).accepted).toBe(true);
+    await expect(peer).toHaveCount(0, { timeout: 16_000 });
     await expect(direct.getByTestId("remote-player-sprite")).toHaveCount(0);
 
+    const homeRelease = home.waitForResponse(
+      (response) =>
+        response.url().endsWith("/api/studio/presence") &&
+        response.request().postDataJSON()?.action === "release",
+    );
+    await home.evaluate(() =>
+      window.dispatchEvent(new PageTransitionEvent("pagehide")),
+    );
+    expect((await (await homeRelease).json()).accepted).toBe(true);
     await home.goto("/grapevine");
     await expect(homeSprite).toHaveAttribute("data-character", "you");
     expect(new Set(requests)).toEqual(new Set(["grapevine", "mint"]));
   } finally {
+    refreshLobby?.();
     await Promise.all([first.close(), second.close()]);
+  }
+});
+
+test("a saved character in use reopens the picker and can be reclaimed after release", async ({
+  browser,
+}) => {
+  const owner = await browser.newContext();
+  const guest = await browser.newContext();
+  const presence = new Presence();
+  const joinTown = (context: BrowserContext) =>
+    context.route("**/api/studio/presence", (route) =>
+      route.fulfill({ json: presence.update(route.request().postDataJSON()) }),
+    );
+  try {
+    await Promise.all([joinTown(owner), joinTown(guest)]);
+    const first = await owner.newPage();
+    await first.goto("/");
+    await first
+      .getByRole("button", { name: "Play as Mint", exact: true })
+      .click();
+    await expect(first.getByTestId("player-sprite")).toHaveAttribute(
+      "data-character",
+      "you",
+    );
+    const second = await guest.newPage();
+    await second.addInitScript(
+      (crew) => {
+        if (!localStorage.getItem("grapevine.clan.v1")) {
+          localStorage.setItem(
+            "grapevine.clan.v1",
+            JSON.stringify({
+              version: 1,
+              castVersion: 11,
+              activeCharacter: "you",
+              player: { x: 850, y: 590 },
+              crew,
+            }),
+          );
+        }
+      },
+      DEFAULT_CREW.map((c) =>
+        c.id === "you"
+          ? { ...c, name: "My Mint", sprite: "data:image/png;base64,AA==" }
+          : c,
+      ),
+    );
+    await second.goto("/grapevine");
+    const mint = second.getByRole("button", {
+      name: "Play as My Mint",
+      exact: true,
+    });
+    await expect(mint).toBeDisabled();
+    await expect(
+      second.getByText("My Mint is already playing in this town."),
+    ).toBeVisible();
+    await expect(second.getByTestId("player-sprite")).toHaveCount(0);
+    const release = first.waitForResponse(
+      (response) =>
+        response.url().endsWith("/api/studio/presence") &&
+        response.request().postDataJSON()?.action === "release",
+    );
+    await first.evaluate(() =>
+      window.dispatchEvent(new PageTransitionEvent("pagehide")),
+    );
+    expect((await (await release).json()).accepted).toBe(true);
+    await first.goto("/mint");
+    await expect(mint).toBeEnabled();
+    await mint.click();
+    await expect(second.getByTestId("player-sprite")).toHaveAttribute(
+      "data-character",
+      "you",
+    );
+  } finally {
+    await Promise.all([owner.close(), guest.close()]);
+  }
+});
+
+test("clicking a live player starts an accepted fight visible to the town", async ({
+  browser,
+}) => {
+  let now = 0;
+  const presence = new Presence({ now: () => now });
+  const duels = new TownDuels({
+    presence,
+    now: () => now,
+    getCharacter: (_worldId, id) => DEFAULT_CREW.find((c) => c.id === id),
+  });
+  const contexts = await Promise.all([
+    browser.newContext(),
+    browser.newContext(),
+    browser.newContext(),
+  ]);
+  try {
+    await Promise.all(
+      contexts.map(async (context) => {
+        await context.route("**/api/studio/presence", (route) => {
+          const input = route.request().postDataJSON();
+          return route.fulfill({
+            json: {
+              ...presence.update(input),
+              duels: duels.snapshot(input.worldId, input.sessionToken),
+            },
+          });
+        });
+        await context.route("**/api/studio/town-duels", (route) =>
+          route.fulfill({ json: duels.act(route.request().postDataJSON()) }),
+        );
+      }),
+    );
+    const [mint, zippy, spectator] = await Promise.all(
+      contexts.map(async (context) => {
+        const page = await context.newPage();
+        await page.goto("/grapevine");
+        return page;
+      }),
+    );
+    for (const [page, name] of [
+      [mint, "Mint"],
+      [zippy, "Zippy"],
+      [spectator, "David"],
+    ] as const) {
+      await page
+        .getByRole("button", { name: `Play as ${name}`, exact: true })
+        .click();
+      await expect(page.getByTestId("player-sprite")).toBeVisible();
+    }
+    const opponent = mint.getByRole("button", {
+      name: "Interact with Zippy",
+      exact: true,
+    });
+    await expect(opponent).toHaveAttribute("aria-description", "Online player");
+    // Fighters share a spawn. Moving apart also verifies that the click targets the avatar.
+    await zippy.keyboard.down("a");
+    try {
+      await expect
+        .poll(async () =>
+          Number(
+            await opponent
+              .getByTestId("remote-player-sprite")
+              .getAttribute("data-x"),
+          ),
+        )
+        .toBeLessThan(760);
+    } finally {
+      await zippy.keyboard.up("a");
+    }
+    await opponent.click();
+    await mint
+      .getByRole("dialog", { name: "Zippy" })
+      .getByRole("button", { name: "Fight", exact: true })
+      .click();
+    await expect(mint.getByText("Waiting for Zippy")).toBeVisible();
+    await expect(
+      spectator.getByRole("region", { name: "Online fight" }),
+    ).toHaveCount(0);
+    await zippy.getByRole("button", { name: "Accept fight" }).click();
+    for (const page of [mint, zippy, spectator]) {
+      await expect(page.getByTestId("town-fight")).toHaveAttribute(
+        "aria-label",
+        "Fight in progress: Mint vs Zippy",
+      );
+    }
+    await expect(
+      spectator.getByRole("button", {
+        name: "Interact with Zippy",
+        exact: true,
+      }),
+    ).toHaveCount(0);
+    now = 6_000;
+    const result = /^(Mint|Zippy) wins!$/;
+    await expect(mint.getByText(result)).toBeVisible();
+    await expect(zippy.getByText(result)).toHaveText(
+      await mint.getByText(result).innerText(),
+    );
+    await expect(spectator.getByTestId("town-fight")).toHaveCount(0);
+    await expect(opponent).toHaveCount(1);
+  } finally {
+    await Promise.all(contexts.map((context) => context.close()));
   }
 });
 
