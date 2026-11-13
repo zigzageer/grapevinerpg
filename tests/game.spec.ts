@@ -340,7 +340,7 @@ test("the game fills the screen immediately and every character can be played", 
     await expect(page.getByRole("dialog")).toHaveCount(0);
     await expect(page.getByTestId("active-character-name")).toHaveText(name);
     await expect(page.locator(".active-citizen .nameplate")).toHaveText(name);
-    if (["David", "Grace", "Tommy"].includes(name)) {
+    if (["David", "Ghost", "Grace", "Milka", "Semi", "Tommy"].includes(name)) {
       await expect(
         page.getByTestId("player-sprite").locator("image"),
       ).toHaveAttribute("href", `/characters/${name.toLowerCase()}.png`);

@@ -134,9 +134,9 @@ describe("signature abilities", () => {
     const signatures = DEFAULT_CREW.filter(
       (character) => character.preset || character.kind === "mint",
     ).map((character) => createBattle(character, "Opponent").player.signatures);
-    expect(signatures).toHaveLength(26);
+    expect(signatures).toHaveLength(28);
     expect(signatures.every((moves) => moves.length > 0)).toBe(true);
-    expect(new Set(signatures.flat().map((move) => move.name)).size).toBe(32);
+    expect(new Set(signatures.flat().map((move) => move.name)).size).toBe(34);
     const renamed = { ...DAVID, name: "Dave", preset: undefined };
     const migrated = { ...DAVID, id: "friend-20" };
     expect(createBattle(renamed, blindian).player.signatures[0].name).toBe(

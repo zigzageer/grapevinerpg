@@ -36,7 +36,7 @@ The illustrated cast members appear in the park and workshop. Local saves upgrad
 - **Grace** is the blonde character summoned by David’s signature move. She also joins the playable cast with the same artwork at `public/characters/grace.png`.
 - **Tommy** wears the reference red cowboy hat with a blue cross and white stars, stitched cowboy boots, and a straw stem. His transparent sprite is at `public/characters/tommy.png`.
 
-- **Ghost**: Black British woman in a plum hijab and sage-green long-sleeved top, holding a Bible in one hand and an oval loaf of bread in the other. AI-generated transparent sprite at `public/characters/ghost.png`. Existing saves add her once without resetting the crew or quest progress.
+- **Ghost** wears a high curly bun, gold hoop earrings, a black outfit with a gold and teal jewel emblem, and white sneakers. Her transparent sprite is at `public/characters/ghost.png`.
 
 - **Rocky**: Israeli Hasidic man in a black hat and coat, side curls, and an olive IDF vest. AI-generated transparent sprite at `public/characters/rocky.png`.
 - **Miel** has pink-tipped auburn hair, floppy bunny ears, gold hoops, a Star of David necklace, a black dress, and lace-up boots. Her reference-based sprite is at `public/characters/miel.png`.

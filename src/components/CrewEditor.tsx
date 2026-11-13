@@ -234,17 +234,6 @@ export function CrewEditor({
               <p>{additionalBio.description}</p>
               <span className="small-badge">Original character sprite</span>
             </div>
-          ) : c.preset === "ghost" && !c.sprite ? (
-            <div className="mint-note">
-              <span className="eyebrow">MEET GHOST</span>
-              <h3>One book. One very good loaf.</h3>
-              <p>
-                Ghost is a Black British woman in a plum hijab and sage-green
-                top. She carries a Bible in one hand and a fresh loaf of bread
-                in the other.
-              </p>
-              <span className="small-badge">Original character sprite</span>
-            </div>
           ) : c.preset === "flag-girl" && !c.sprite ? (
             <div className="mint-note">
               <span className="eyebrow">MEET THE NEW GIRL</span>

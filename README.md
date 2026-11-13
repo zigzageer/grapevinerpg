@@ -43,7 +43,7 @@ The **TV episode look** is on by default: color grading, paper grain, fine broad
 
 ## Cast & workshop
 
-The main game has 26 playable cast members. babashark wears an olive officer uniform and travels with her daughter. Orrow chatters while standing and moving, and kawaiikitty rolls around in her gaming chair. The Mint workshop supports up to 40 characters and retains customized friends from older saves. Discord towns support up to 24.
+The main game has 28 playable cast members. babashark wears an olive officer uniform and travels with her daughter. Orrow chatters while standing and moving, and kawaiikitty rolls around in her gaming chair. The Mint workshop supports up to 40 characters and retains customized friends from older saves. Discord towns support up to 24.
 
 Open **Pause → Character workshop** or the workshop button in the picker to edit names, upload transparent PNG/WebP sprites (under 1 MB), or export/import the crew. Restore a standard cutout to edit individual appearance traits. Generated character sprites have a fixed appearance.
 

@@ -11,6 +11,21 @@ export const ADDITIONAL_BIOS: Partial<
     description:
       "Sarina wears a dark green officer cap and shirt, a black skirt, and gold bracelets. She carries the green, white, and red Lion and Sun flag.",
   },
+  ghost: {
+    title: "Gold hoops and a teal jewel.",
+    description:
+      "Ghost wears her black curls in a high bun, with gold hoop earrings, a black outfit with a teal jewel emblem, and white sneakers.",
+  },
+  milka: {
+    title: "Eight flags, one knot.",
+    description:
+      "Milka is a walking bundle of Latvian, Polish, Russian, Ukrainian, Belarusian, Italian, Malian, and Moroccan flags, tied at the waist with a thick rope.",
+  },
+  semi: {
+    title: "Fried chicken to go.",
+    description:
+      "Semi has a round build, a messy brown bun, a pink tank top, and black pants. She takes a bite of fried chicken while a gray tabby peeks out of her striped bucket.",
+  },
   babashark: {
     title: "Here comes the officer.",
     description:

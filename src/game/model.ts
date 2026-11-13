@@ -50,11 +50,13 @@ export interface Character {
     | "orrow"
     | "potato"
     | "kawaiikitty"
-    | "babashark";
+    | "babashark"
+    | "semi"
+    | "milka";
 }
 export interface SaveGame {
   version: 1;
-  castVersion: 11;
+  castVersion: 12;
   activeCharacter?: string;
   tvLook?: boolean;
   player: Point;
@@ -114,13 +116,13 @@ export const GHOST: Character = {
   name: "Ghost",
   kind: "human",
   preset: "ghost",
-  skin: "#895332",
-  hair: "long",
-  hairColor: "#241b1c",
-  shirt: "#85936a",
-  pants: "#34323a",
+  skin: "#754428",
+  hair: "curly",
+  hairColor: "#1c191e",
+  shirt: "#232027",
+  pants: "#232027",
   hat: "none",
-  hatColor: "#61234c",
+  hatColor: "#232027",
   glasses: false,
 };
 export const ROCKY: Character = {
@@ -425,6 +427,34 @@ export const BABASHARK: Character = {
   hatColor: "#53573e",
   glasses: false,
 };
+export const SEMI: Character = {
+  id: "cast-semi",
+  name: "Semi",
+  kind: "human",
+  preset: "semi",
+  skin: "#eab078",
+  hair: "messy",
+  hairColor: "#603917",
+  shirt: "#d55d85",
+  pants: "#332d33",
+  hat: "none",
+  hatColor: "#d55d85",
+  glasses: false,
+};
+export const MILKA: Character = {
+  id: "cast-milka",
+  name: "Milka",
+  kind: "human",
+  preset: "milka",
+  skin: "#c62036",
+  hair: "bald",
+  hairColor: "#762138",
+  shirt: "#254a99",
+  pants: "#2b884e",
+  hat: "none",
+  hatColor: "#b99050",
+  glasses: false,
+};
 export const characterKey = (c: Character) => c.id;
 export const characterScale = (c: Character) =>
   c.heightScale ?? (c.preset === "blindian" ? 1.45 : 1);
@@ -477,6 +507,8 @@ export const DEFAULT_CREW: Character[] = [
   TOMMY,
   ...CAST_VERSION_10_ADDITIONS,
   BABASHARK,
+  SEMI,
+  MILKA,
 ];
 const castPresets = new Set<string>(
   DEFAULT_CREW.flatMap(({ preset }) => (preset ? [preset] : [])),
@@ -484,7 +516,7 @@ const castPresets = new Set<string>(
 
 export const initialSave = (): SaveGame => ({
   version: 1,
-  castVersion: 11,
+  castVersion: 12,
   tvLook: true,
   player: { ...START },
   crew: DEFAULT_CREW.map((c) => ({ ...c })),
@@ -706,12 +738,14 @@ export function loadSave(
           crew.push({ ...character, id: `friend-${crew.length}` });
       }
     }
-    if (previousCastVersion < 11) {
+    if (previousCastVersion < 12) {
       const additions = [
         ...(previousCastVersion < 8 ? CAST_ADDITIONS : []),
         ...(previousCastVersion < 9 ? [GRACE, TOMMY] : []),
         ...(previousCastVersion < 10 ? CAST_VERSION_10_ADDITIONS : []),
-        BABASHARK,
+        ...(previousCastVersion < 11 ? [BABASHARK] : []),
+        SEMI,
+        MILKA,
       ];
       for (const character of additions) {
         if (
@@ -736,7 +770,7 @@ export function loadSave(
         : { ...spawn };
     return {
       version: 1,
-      castVersion: 11,
+      castVersion: 12,
       tvLook: raw.tvLook !== false,
       activeCharacter:
         typeof raw.activeCharacter === "string"

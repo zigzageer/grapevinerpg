@@ -12,7 +12,9 @@ import {
   BABASHARK,
   CAST_VERSION_10_ADDITIONS,
   GRACE,
+  MILKA,
   MINT_CREW_LIMIT,
+  SEMI,
   TOMMY,
   parseCrew,
   START,
@@ -150,16 +152,18 @@ describe("cast updates and saved characters", () => {
         "potato",
         "kawaiikitty",
         "babashark",
+        "semi",
+        "milka",
       ]);
       expect(migrated.crew[1].name).toBe("Sam");
       expect(migrated).toMatchObject({
         greeted: true,
         inspected: true,
         player: { x: 720, y: 560 },
-        castVersion: 11,
+        castVersion: 12,
       });
       data = JSON.stringify(migrated);
-      expect(loadSave().crew).toHaveLength(28);
+      expect(loadSave().crew).toHaveLength(DEFAULT_CREW.length);
       // Replacing the imported cast intentionally must not re-add removed characters on every reload.
       data = JSON.stringify({ ...migrated, crew: migrated.crew.slice(0, 3) });
       expect(loadSave().crew).toHaveLength(3);
@@ -180,7 +184,7 @@ describe("cast updates and saved characters", () => {
     });
     try {
       const migrated = loadSave();
-      expect(migrated.crew).toHaveLength(28);
+      expect(migrated.crew).toHaveLength(DEFAULT_CREW.length);
       expect(migrated.crew[3]).toMatchObject({
         name: "Sammy",
         preset: "baguette-guy",
@@ -205,13 +209,15 @@ describe("cast updates and saved characters", () => {
   });
 });
 
-it.each([8, 9, 10])(
+it.each([8, 9, 10, 11])(
   "expands a version %i save without replacing characters",
   (castVersion) => {
     const additions = [
       ...(castVersion < 9 ? [GRACE, TOMMY] : []),
       ...(castVersion < 10 ? CAST_VERSION_10_ADDITIONS : []),
-      BABASHARK,
+      ...(castVersion < 11 ? [BABASHARK] : []),
+      SEMI,
+      MILKA,
     ];
     const addedIds = new Set(additions.map((character) => character.id));
     const crew = DEFAULT_CREW.filter(
@@ -238,7 +244,7 @@ it.each([8, 9, 10])(
     try {
       const migrated = loadSave();
       expect(migrated).toMatchObject({
-        castVersion: 11,
+        castVersion: 12,
         activeCharacter: previous.activeCharacter,
         player: previous.player,
       });
