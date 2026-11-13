@@ -13,6 +13,7 @@ import { StudioError } from "./studio-store.mjs";
 
 const A = "123456789012345678";
 const B = "223456789012345678";
+const NEW_GUILD = "723456789012345678";
 const FIRST = "323456789012345678";
 const SECOND = "423456789012345678";
 const ADMIN = "523456789012345678";
@@ -100,13 +101,12 @@ function setup(t, { grapevineGuildId = A } = {}) {
         }),
       );
     },
-    assign(guildId, memberId, characterId, manageGuild = true) {
+    assign(guildId, memberId, characterId, userId = FIRST) {
       return matches.updateFighter(
-        request(guildId, ADMIN, {
+        request(guildId, userId, {
           action: "assign",
-          memberId,
+          ...(memberId === undefined ? {} : { memberId }),
           characterId,
-          manageGuild,
         }),
       );
     },
@@ -251,7 +251,7 @@ test("Zippy and Footjobofsteel use their new moves in Discord auto fights", () =
   assert.deepEqual([...moves.keys()], []);
 });
 
-test("legacy fighters are guild scoped, owners can equip multiple choices, and pause survives restart", async (t) => {
+test("ordinary members can assign available fighters and keep their choices across restarts", async (t) => {
   const h = setup(t);
   const ownChoice = { id: characterId(FIRST), name: "Rue" };
   assert.deepEqual(await h.matches.getFighter(A, FIRST), {
@@ -264,18 +264,11 @@ test("legacy fighters are guild scoped, owners can equip multiple choices, and p
   assert.ok(
     (await h.matches.listFighters(A)).characters.some(({ id }) => id === "you"),
   );
-  assert.ok(
-    !(await h.matches.listFighters(B)).characters.some(
-      ({ id }) => id === "you",
-    ),
-  );
-  await assert.rejects(h.assign(B, FIRST, "you"), { status: 404 });
-  await assert.rejects(h.assign(A, FIRST, "you", false), { status: 403 });
   await assert.rejects(h.assign(A, SECOND, characterId(FIRST)), {
     status: 409,
   });
 
-  assert.deepEqual(await h.assign(A, FIRST, "you"), {
+  assert.deepEqual(await h.assign(A, undefined, "you"), {
     userId: FIRST,
     characterId: "you",
     name: "Mint",
@@ -284,6 +277,9 @@ test("legacy fighters are guild scoped, owners can equip multiple choices, and p
   await h.assign(A, FIRST, "cast-grace");
   await assert.rejects(h.assign(A, SECOND, "you"), { status: 409 });
   await assert.rejects(h.set(A, SECOND, "you"), { status: 403 });
+  assert.deepEqual((await h.matches.listFighters(A)).characters, [
+    { id: DAVID_ID, name: "David" },
+  ]);
   assert.equal((await h.set(A, FIRST)).characterId, ownChoice.id);
   assert.equal((await h.set(A, FIRST, "cast-grace")).enabled, true);
   assert.equal((await h.assign(A, FIRST, "you")).enabled, false);
@@ -312,22 +308,50 @@ test("legacy fighters are guild scoped, owners can equip multiple choices, and p
   assert.equal((await h.set(A, FIRST)).characterId, "cast-grace");
   await h.matches.updateFighter(pause);
   assert.equal((await h.matches.getFighter(A, FIRST)).enabled, true);
-  h.games.delete(A);
+  assert.equal((await h.assign(A, SECOND, DAVID_ID)).enabled, false);
+  const second = await h.matches.getFighter(A, SECOND);
+  assert.equal(second.characterId, characterId(SECOND));
+  assert.equal(second.enabled, false);
+  assert.ok(second.choices.some(({ id }) => id === DAVID_ID));
+  assert.equal((await h.set(A, SECOND, DAVID_ID)).characterId, DAVID_ID);
+});
+
+test("a new server can fight with the shared cast and claims are independent by server", async (t) => {
+  const h = setup(t);
+  assert.ok(!h.games.has(NEW_GUILD));
+  assert.deepEqual(
+    (await h.matches.listFighters(NEW_GUILD)).characters.map(({ id }) => id),
+    [DAVID_ID, "cast-grace", "you"],
+  );
+  await assert.rejects(h.assign(NEW_GUILD, FIRST, characterId(FIRST)), {
+    status: 404,
+  });
+  await h.assign(A, FIRST, DAVID_ID);
+  await h.assign(NEW_GUILD, SECOND, DAVID_ID);
+  const claims = await Promise.allSettled([
+    h.assign(NEW_GUILD, undefined, "cast-grace"),
+    h.assign(NEW_GUILD, undefined, "cast-grace", ADMIN),
+  ]);
+  assert.equal(claims[0].status, "fulfilled");
+  assert.equal(claims[1].status, "rejected");
+  assert.equal(claims[1].reason.status, 409);
+  assert.equal((await h.set(NEW_GUILD, FIRST)).characterId, "cast-grace");
+  assert.equal((await h.set(NEW_GUILD, SECOND)).characterId, DAVID_ID);
+  assert.equal((await h.set(A, FIRST, DAVID_ID)).enabled, true);
+  assert.equal((await h.matches.getFighter(B, SECOND)).enabled, false);
   assert.ok(
-    (await h.matches.listFighters(A)).characters.some(
-      ({ id }) => id === "cast-grace",
+    (await h.matches.listFighters(B)).characters.some(
+      ({ id }) => id === DAVID_ID,
     ),
   );
-  await h.assign(A, SECOND, DAVID_ID);
-  assert.equal((await h.matches.getFighter(A, SECOND)).characterId, DAVID_ID);
-  assert.equal((await h.set(A, SECOND)).characterId, DAVID_ID);
-  assert.deepEqual(await h.matches.getFighter(B, ADMIN), {
-    userId: ADMIN,
-    characterId: null,
-    name: null,
-    enabled: false,
-    choices: [],
-  });
+
+  const { match } = await h.fight(NEW_GUILD);
+  assert.equal(match.status, "finished");
+  assert.equal(match.sides[0].name, "Discord server");
+  assert.deepEqual(
+    match.sides.map(({ players }) => players[0].name),
+    ["Grace", "David"],
+  );
 });
 
 test("fights require two opted-in members and protect public match data", async (t) => {
@@ -567,14 +591,13 @@ test("fighter, fight, and leaderboard routes require the signed bot bridge", asy
   const assigned = await send(
     "POST",
     root + "/fighters",
-    h.request(A, ADMIN, {
+    h.request(A, FIRST, {
       action: "assign",
-      memberId: FIRST,
       characterId: "you",
-      manageGuild: true,
     }),
   );
   assert.equal(assigned.status, 200);
+  assert.equal(assigned.response.userId, FIRST);
   assert.equal(assigned.response.enabled, false);
   const choice = await send("GET", root + "/fighters/" + A + "/" + FIRST);
   assert.ok(choice.response.choices.some(({ id }) => id === "you"));

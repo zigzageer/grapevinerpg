@@ -211,28 +211,22 @@ export class MatchService {
 
   async loadFightRoster(guildId) {
     if (!snowflake(guildId)) invalid("Invalid server ID.");
-    let game;
-    let legacy;
-    if (guildId === this.grapevineGuildId) {
-      const optionalGame = async (id) => {
-        try {
-          return await this.loadGame(id);
-        } catch (error) {
-          if (!(error instanceof StudioError && error.status === 404))
-            throw error;
-          return null;
-        }
-      };
-      [game, legacy] = await Promise.all([
-        optionalGame(guildId),
-        optionalGame("mint"),
-      ]);
-      if (!game && !legacy) invalid("This town has not been created yet.", 404);
-    } else {
-      game = await this.loadGame(guildId);
-    }
+    const optionalGame = async (id) => {
+      try {
+        return await this.loadGame(id);
+      } catch (error) {
+        if (!(error instanceof StudioError && error.status === 404))
+          throw error;
+        return null;
+      }
+    };
+    const [game, mint] = await Promise.all([
+      optionalGame(guildId),
+      optionalGame("mint"),
+    ]);
+    if (!game && !mint) invalid("No fighter roster is available yet.", 404);
     const characters = new Map();
-    for (const roster of [legacy, game]) {
+    for (const roster of [mint, game]) {
       for (const character of roster?.characters ?? []) {
         if (
           validCharacterId(character?.id) &&
@@ -242,7 +236,12 @@ export class MatchService {
           characters.set(character.id, character);
       }
     }
-    return { name: game?.name ?? "Grapevine", characters };
+    return {
+      name:
+        game?.name ??
+        (guildId === this.grapevineGuildId ? "Grapevine" : "Discord server"),
+      characters,
+    };
   }
 
   fighterPreference(guildId, userId) {
@@ -267,6 +266,7 @@ export class MatchService {
     const { characters } = await this.loadFightRoster(guildId);
     return {
       characters: [...characters.values()]
+        .filter(({ id }) => !this.fightOwner(guildId, id))
         .map((character) => ({
           id: character.id,
           name: characterName(character),
@@ -312,14 +312,14 @@ export class MatchService {
 
   updateFighter(input) {
     const { action, guildId, userId, memberId, characterId } = input;
+    const fighterUser =
+      action === "assign" && memberId !== undefined ? memberId : userId;
     return this.mutate(
       "fighter",
       input,
       async () => {
         if (action === "assign") {
-          if (input.manageGuild !== true)
-            invalid("Manage Server is required to assign fighters.", 403);
-          if (!snowflake(memberId) || !validCharacterId(characterId))
+          if (!snowflake(fighterUser) || !validCharacterId(characterId))
             invalid("Choose a server member and a character.");
         } else if (action === "set" || action === "pause") {
           if (memberId !== undefined && memberId !== userId)
@@ -333,7 +333,6 @@ export class MatchService {
         return this.loadFightRoster(guildId);
       },
       (roster) => {
-        const fighterUser = action === "assign" ? memberId : userId;
         const preference = this.fighterPreference(guildId, fighterUser);
         if (action === "pause") {
           this.db

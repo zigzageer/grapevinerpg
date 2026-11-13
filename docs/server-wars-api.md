@@ -36,7 +36,7 @@ For the existing Ubuntu deployment, the studio and bot can load the same root-ow
 
 ## Automatic Discord fights
 
-`/fighter set` selects an owned fighter and enables automatic fights in that server. A bot-created character with ID `discord-<userId>` is already eligible. A server manager can use `/fighter assign` to grant an existing roster character to a member, who then enables it with `/fighter set`. `/fighter pause` opts out. The optional studio setting `MINT_GRAPEVINE_GUILD_ID` lets managers in that Discord guild assign published characters from the legacy Grapevine roster as well as their guild roster. Set it to the verified Discord guild ID.
+Any server member can use `/fighter assign character:<name>` to claim an available fighter, or add `user:@member` to assign that fighter to another member. The published Mint cast is available as soon as the bot joins. Each server keeps its own claims and any additional characters created there. A bot-created character with ID `discord-<userId>` already belongs to that member. Use `/fighter set` to select one of your fighters and opt in to automatic fights. `/fighter pause` opts out.
 
 `/fight user:@member` starts a simulated duel between two enabled fighters. The VPS saves the replay and score once. The bot attaches the resulting GIF, the winner, and a replay link in the channel. Use `/duel` for a turn-by-turn challenge.
 
@@ -44,13 +44,13 @@ For the existing Ubuntu deployment, the studio and bot can load the same root-ow
 
 ### Signed bot endpoints
 
-Use the same dedicated match secret and interaction ID as above. The bot checks membership, bots, channel permissions, and Manage Server against the Discord interaction.
+Use the same dedicated match secret and interaction ID as above. The bot verifies that the invoking user and any selected user are members of the server. It checks channel permissions before posting fight results.
 
 | Method and path                                  | Request or result                                                                                                                                                                                                                           |
 | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET /internal/v1/fighters/<guildId>`            | `{ characters: [{ id, name }] }` for manager autocomplete.                                                                                                                                                                                  |
+| `GET /internal/v1/fighters/<guildId>`            | `{ characters: [{ id, name }] }` lists unclaimed fighters for assignment autocomplete.                                                                                                                                                       |
 | `GET /internal/v1/fighters/<guildId>/<memberId>` | `{ userId, characterId, name, enabled, choices: [{ id, name }] }` for fighter selection.                                                                                                                                                    |
-| `POST /internal/v1/fighters`                     | `{ requestId, guildId, userId, action, characterId?, memberId?, manageGuild? }`. Actions `set`, `pause`, and `assign`. Assignment requires `memberId`, `characterId`, and `manageGuild: true`. Returns the fighter selection or assignment. |
+| `POST /internal/v1/fighters`                     | `{ requestId, guildId, userId, action, characterId?, memberId? }`. Actions `set`, `pause`, and `assign`. Assignment requires `characterId` and defaults to the invoking user when `memberId` is omitted. Returns the fighter selection or assignment. |
 | `POST /internal/v1/fights`                       | `{ requestId, guildId, userId, opponentUserId }` → `{ match, score: { awarded, winnerUserId } }`. An identical retry returns the saved result.                                                                                              |
 | `GET /internal/v1/fights/<matchId>/gif`          | `202` with `{ status: "queued" }` while rendering, `200 image/gif` when ready, or `503` if unavailable. The bot can still deliver the winner and `match.replayUrl`.                                                                         |
 | `GET /internal/v1/leaderboards/global`           | `{ entries: [{ rank, userId, name, wins, losses, points }] }` for all guilds.                                                                                                                                                               |
